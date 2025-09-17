@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Puissance 4 dynamique avec colonnes</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body { font-family: sans-serif; }
+  input { width: 400px; margin-bottom: 10px; }
+  svg { border: 1px solid #ccc; display: block; margin-top: 10px; }
+  text { font-size: 16px; text-anchor: middle; }
+</style>
+</head>
+<body>
+
+<h2>Puissance 4 - Entrez les colonnes (1 à 7)</h2>
+<input type="text" id="inputBoard" placeholder="Ex : 443215..." maxlength="42" />
+
+<svg id="board" width="350" height="330"></svg>
+
+<script>
+const rows = 6;
+const cols = 7;
+const cellSize = 50;
+const svg = d3.select("#board");
+
+let board = Array.from({length: rows}, () => Array(cols).fill(0));
+
+function renderBoard() {
+    svg.selectAll("*").remove();
+
+    // Dessiner les cercles
+    svg.selectAll("circle")
+       .data(board.flat())
+       .enter()
+       .append("circle")
+       .attr("cx", (d,i) => (i % cols) * cellSize + cellSize/2)
+       .attr("cy", (d,i) => Math.floor(i / cols) * cellSize + cellSize/2)
+       .attr("r", cellSize/2 - 5)
+       .attr("fill", d => {
+           if(d === 1) return "red";
+           if(d === 2) return "yellow";
+           return "white";
+       })
+       .attr("stroke", "black");
+
+    // Ajouter les numéros de colonnes
+    svg.selectAll("text")
+       .data(d3.range(1, cols+1))
+       .enter()
+       .append("text")
+       .attr("x", (d,i) => i * cellSize + cellSize/2)
+       .attr("y", rows * cellSize + 20)
+       .text(d => d);
+}
+
+function checkWinner(board) {
+    const rows = board.length;
+    const cols = board[0].length;
+
+    // Parcourir chaque case
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const player = board[r][c];
+            if (player === 0) continue;
+
+            // 1. Horizontal
+            if (c + 3 < cols &&
+                player === board[r][c+1] &&
+                player === board[r][c+2] &&
+                player === board[r][c+3]) {
+                return player;
+            }
+
+            // 2. Vertical
+            if (r + 3 < rows &&
+                player === board[r+1][c] &&
+                player === board[r+2][c] &&
+                player === board[r+3][c]) {
+                return player;
+            }
+
+            // 3. Diagonale descendante (\)
+            if (r + 3 < rows && c + 3 < cols &&
+                player === board[r+1][c+1] &&
+                player === board[r+2][c+2] &&
+                player === board[r+3][c+3]) {
+                return player;
+            }
+
+            // 4. Diagonale ascendante (/)
+            if (r - 3 >= 0 && c + 3 < cols &&
+                player === board[r-1][c+1] &&
+                player === board[r-2][c+2] &&
+                player === board[r-3][c+3]) {
+                return player;
+            }
+        }
+    }
+
+    return 0; // personne n'a gagné
+}
+
+
+function updateBoard(input) {
+    board = Array.from({length: rows}, () => Array(cols).fill(0));
+    let turn = 0;
+
+    for(let char of input) {
+        const col = parseInt(char) - 1;
+        if(col < 0 || col >= cols) continue;
+
+        for(let r = rows - 1; r >= 0; r--) {
+            if(board[r][col] === 0) {
+                board[r][col] = (turn % 2 === 0) ? 1 : 2;
+                turn++;
+                break;
+            }
+        }
+    }
+
+    renderBoard();
+
+    const winner = checkWinner(board);
+    if (winner === 1) {
+        alert("Rouge a gagné !");
+    } else if (winner === 2) {
+        alert("Jaune a gagné !");
+    }
+}
+
+
+document.getElementById('inputBoard').addEventListener('input', e => {
+    const value = e.target.value.replace(/[^1-7]/g,'');
+    e.target.value = value;
+    updateBoard(value);
+});
+
+renderBoard();
+</script>
+
+</body>
+</html>
