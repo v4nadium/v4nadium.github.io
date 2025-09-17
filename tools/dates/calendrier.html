@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Calendrier Annoté</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .calendar-container {
+      flex: 1;
+      overflow-y: scroll;
+      padding: 20px;
+      background-color: #f8f8f8;
+    }
+    .calendar-nav {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .calendar-nav button {
+      font-size: 18px;
+      padding: 5px 10px;
+      margin: 0 10px;
+    }
+    .calendar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+    }
+    .month {
+      width: 300px;
+      margin: 10px;
+      border: 1px solid #ccc;
+      background-color: #fff;
+    }
+    .month h3 {
+      text-align: center;
+      margin: 0;
+      padding: 5px;
+      background-color: #eee;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      width: 14.28%;
+      height: 30px;
+      text-align: center;
+      border: 1px solid #ddd;
+      cursor: pointer;
+    }
+    .week-number {
+      background-color: #eee;
+      font-weight: bold;
+      cursor: default;
+    }
+    .today {
+      background-color: yellow !important;
+    }
+    .weekend, .holiday {
+      background-color: #ccc;
+    }
+    .noted {
+      background-color: #87cefa !important;
+    }
+
+    /* Zone de saisie latérale */
+    .sidebar {
+      width: 300px;
+      border-left: 2px solid #ddd;
+      padding: 20px;
+      background-color: #fff;
+      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    }
+    .sidebar h3 {
+      margin-top: 0;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      resize: vertical;
+    }
+  </style>
+</head>
+<body>
+  <div class="calendar-container">
+    <div class="calendar-nav">
+      <button onclick="changeYear(-1)">← Année précédente</button>
+      <span id="year-title" style="font-size: 20px; font-weight: bold;"></span>
+      <button onclick="changeYear(1)">Année suivante →</button>
+      <button onclick="exportToICS()">📤 Export .ics</button>
+      <input type="file" accept=".ics" onchange="importFromICS(event)">
+
+    </div>
+    <div id="calendar" class="calendar"></div>
+  </div>
+
+  <div class="sidebar">
+    <h3 id="note-title">Aucune date sélectionnée</h3>
+    <textarea id="note-area" placeholder="Événements de ce jour..." disabled></textarea>
+  </div>
+
+  <script>
+    const holidays = (year) => {
+      const fixed = [`01-01`,`05-01`,`05-08`,`07-14`,`08-15`,`11-01`,`11-11`,`12-25`];
+      const easter = calcEaster(year);
+      const mobile = [
+        offsetDate(easter, 1),
+        offsetDate(easter, 39),
+        offsetDate(easter, 50)
+      ];
+      return new Set([...fixed.map(d => `${year}-${d}`), ...mobile]);
+    };
+
+    function calcEaster(year) {
+      const f = Math.floor, G = year % 19, C = f(year / 100),
+      H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30,
+      I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11)),
+      J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7,
+      L = I - J, month = 3 + f((L + 40) / 44),
+      day = L + 28 - 31 * f(month / 4);
+      return new Date(year, month - 1, day);
+    }
+
+    function offsetDate(date, offset) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + offset);
+      return d.toISOString().slice(0, 10);
+    }
+
+    let currentYear = new Date().getFullYear();
+    let selectedDate = null;
+
+    function changeYear(offset) {
+      currentYear += offset;
+      renderCalendar(currentYear);
+      clearNote();
+    }
+
+    function getWeekNumber(date) {
+      const tempDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dayNum = tempDate.getUTCDay() || 7;
+      tempDate.setUTCDate(tempDate.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(),0,1));
+      return Math.ceil((((tempDate - yearStart) / 86400000) + 1) / 7);
+    }
+
+    function renderCalendar(year) {
+      const calendar = document.getElementById("calendar");
+      const yearTitle = document.getElementById("year-title");
+      calendar.innerHTML = "";
+      yearTitle.textContent = year;
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const holidaysSet = holidays(year);
+
+      const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+                          "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+      for (let month = 0; month < 12; month++) {
+        const monthDiv = document.createElement("div");
+        monthDiv.className = "month";
+        const title = document.createElement("h3");
+        title.textContent = monthNames[month];
+        monthDiv.appendChild(title);
+
+        const table = document.createElement("table");
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        const weekTh = document.createElement("th");
+        weekTh.textContent = "Sem";
+        headRow.appendChild(weekTh);
+        ["L", "M", "M", "J", "V", "S", "D"].forEach(d => {
+          const th = document.createElement("th");
+          th.textContent = d;
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        let current = new Date(firstDay);
+        current.setDate(current.getDate() - ((current.getDay() + 6) % 7));
+
+        while (current <= lastDay || current.getDay() !== 1) {
+          const row = document.createElement("tr");
+          const weekTd = document.createElement("td");
+          weekTd.className = "week-number";
+          weekTd.textContent = getWeekNumber(current);
+          row.appendChild(weekTd);
+
+          for (let i = 0; i < 7; i++) {
+            const td = document.createElement("td");
+            const dateStr = current.toISOString().slice(0, 10);
+
+            if (current.getMonth() === month) {
+              td.textContent = current.getDate();
+              td.dataset.date = dateStr;
+              td.onclick = () => selectDate(dateStr);
+
+              if (dateStr === todayStr) td.classList.add("today");
+              if (current.getDay() === 0 || current.getDay() === 6) td.classList.add("weekend");
+              if (holidaysSet.has(dateStr)) td.classList.add("holiday");
+              if (localStorage.getItem("note-" + dateStr)) td.classList.add("noted");
+            }
+
+            row.appendChild(td);
+            current.setDate(current.getDate() + 1);
+          }
+          tbody.appendChild(row);
+        }
+
+        table.appendChild(tbody);
+        monthDiv.appendChild(table);
+        calendar.appendChild(monthDiv);
+      }
+    }
+
+    function selectDate(dateStr) {
+      selectedDate = dateStr;
+      const noteArea = document.getElementById("note-area");
+      const title = document.getElementById("note-title");
+
+      title.textContent = "Note du " + formatDate(dateStr);
+      noteArea.disabled = false;
+      noteArea.value = localStorage.getItem("note-" + dateStr) || "";
+      noteArea.oninput = () => {
+        localStorage.setItem("note-" + dateStr, noteArea.value);
+        updateNoteHighlight(dateStr);
+      };
+    }
+
+    function updateNoteHighlight(dateStr) {
+      document.querySelectorAll(`[data-date="${dateStr}"]`).forEach(td => {
+        if (localStorage.getItem("note-" + dateStr)) {
+          td.classList.add("noted");
+        } else {
+          td.classList.remove("noted");
+        }
+      });
+    }
+
+    function clearNote() {
+      selectedDate = null;
+      document.getElementById("note-title").textContent = "Aucune date sélectionnée";
+      const noteArea = document.getElementById("note-area");
+      noteArea.value = "";
+      noteArea.disabled = true;
+      noteArea.oninput = null;
+    }
+
+    function formatDate(dateStr) {
+      const [year, month, day] = dateStr.split("-").map(Number);
+      const d = new Date(year, month - 1, day+1); // ← interprétation locale correcte
+      return d.toLocaleDateString("fr-FR", {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
+
+    function exportToICS() {
+      let icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Calendrier Annoté//FR\n`;
+      for (let key in localStorage) {
+        if (key.startsWith("note-")) {
+          const date = key.slice(5); // "YYYY-MM-DD"
+          const summary = localStorage.getItem(key).replace(/\r?\n|\r/g, " "); // note sans sauts de ligne
+          const uid = `${date}@calendrier.local`;
+          icsContent += [
+            "BEGIN:VEVENT",
+            `UID:${uid}`,
+            `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+            `DTSTART;VALUE=DATE:${date.replace(/-/g, "")}`,
+            `SUMMARY:${summary}`,
+            "END:VEVENT"
+          ].join("\n") + "\n";
+        }
+      }
+      icsContent += "END:VCALENDAR";
+
+      const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "notes_calendrier.ics";
+      a.click();
+    }
+
+    function importFromICS(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const content = e.target.result;
+        const events = content.split("BEGIN:VEVENT").slice(1);
+        events.forEach(eventBlock => {
+          const lines = eventBlock.split(/\r?\n/);
+          let date = "", summary = "";
+          for (let line of lines) {
+            if (line.startsWith("DTSTART")) {
+              date = line.split(":")[1];
+              date = `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}`;
+            } else if (line.startsWith("SUMMARY")) {
+              summary = line.slice(8).trim();
+            }
+          }
+          if (date && summary) {
+            localStorage.setItem("note-" + date, summary);
+          }
+        });
+        alert("Import terminé. Recharge la page pour voir les changements.");
+      };
+      reader.readAsText(file);
+    }
+
+
+    renderCalendar(currentYear);
+  </script>
+</body>
+</html>
