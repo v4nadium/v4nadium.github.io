@@ -2,13 +2,12 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mes outils HTML</title>
+  <title>Mes Outils HTML</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f9f9f9;
       margin: 20px;
+      background-color: #f5f5f5;
     }
 
     h1 {
@@ -64,44 +63,81 @@
   <h1>Mes Outils HTML</h1>
   <input type="text" id="searchBar" placeholder="Rechercher un outil...">
 
-  <div class="category">
-    <h2>Calendriers</h2>
-    <ul class="tool-list">
-      <li><a href="calendrier1.html">Calendrier Annuel</a></li>
-      <li><a href="calendrier2.html">Calendrier Éditable</a></li>
-    </ul>
-  </div>
-
-  <div class="category">
-    <h2>Convertisseurs</h2>
-    <ul class="tool-list">
-      <li><a href="convertisseur-texte.html">Convertisseur de texte</a></li>
-      <li><a href="convertisseur-mesures.html">Convertisseur de mesures</a></li>
-    </ul>
-  </div>
-
-  <div class="category">
-    <h2>Utilitaires</h2>
-    <ul class="tool-list">
-      <li><a href="editeur-html.html">Éditeur HTML</a></li>
-      <li><a href="compteur-mots.html">Compteur de mots</a></li>
-    </ul>
-  </div>
+  <div id="toolContainer"></div>
 
   <script>
+    // CSV avec Nom;Catégorie;Lien
+    const csvData = `
+Calendrier annuel;Calendriers;./tools/calendar.html
+Éditeur HTML;Utilitaires;./tools/editor.html
+Convertisseur de texte;Convertisseurs;./tools/text-converter.html
+Compteur de mots;Utilitaires;./tools/word-counter.html
+Générateur Lorem Ipsum;Utilitaires;./tools/lorem.html
+Convertisseur d'unités;Convertisseurs;./tools/unit-converter.html
+    `.trim();
+
+    const lines = csvData.split('\n');
+    const tools = lines.map(line => {
+      const [name, category, path] = line.split(';').map(s => s.trim());
+      return { name, category, path };
+    });
+
+    // Regrouper les outils par catégorie
+    const categories = {};
+    tools.forEach(tool => {
+      if (!categories[tool.category]) {
+        categories[tool.category] = [];
+      }
+      categories[tool.category].push(tool);
+    });
+
+    // Créer le HTML
+    const container = document.getElementById('toolContainer');
+    const sortedCategoryNames = Object.keys(categories).sort();
+
+    sortedCategoryNames.forEach(categoryName => {
+      const categoryDiv = document.createElement('div');
+      categoryDiv.className = 'category';
+
+      const h2 = document.createElement('h2');
+      h2.textContent = categoryName;
+      categoryDiv.appendChild(h2);
+
+      const ul = document.createElement('ul');
+      ul.className = 'tool-list';
+
+      const sortedTools = categories[categoryName].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+
+      sortedTools.forEach(tool => {
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="${tool.path}">${tool.name}</a>`;
+        ul.appendChild(li);
+      });
+
+      categoryDiv.appendChild(ul);
+      container.appendChild(categoryDiv);
+    });
+
+    // Recherche
     const searchInput = document.getElementById('searchBar');
-    const links = document.querySelectorAll('.tool-list li');
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase();
 
-    searchInput.addEventListener('input', function () {
-      const query = this.value.toLowerCase();
+      // Parcourir toutes les catégories
+      document.querySelectorAll('.category').forEach(categoryDiv => {
+        let anyVisible = false;
 
-      links.forEach(link => {
-        const text = link.textContent.toLowerCase();
-        if (text.includes(query)) {
-          link.classList.remove('hidden');
-        } else {
-          link.classList.add('hidden');
-        }
+        categoryDiv.querySelectorAll('li').forEach(li => {
+          const text = li.textContent.toLowerCase();
+          const match = text.includes(query);
+          li.style.display = match ? '' : 'none';
+          if (match) anyVisible = true;
+        });
+
+        // Masquer la catégorie si aucun résultat
+        categoryDiv.style.display = anyVisible ? '' : 'none';
       });
     });
   </script>
