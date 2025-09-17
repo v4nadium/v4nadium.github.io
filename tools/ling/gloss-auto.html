@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Interlinear Gloss Editor</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.14/lib/codemirror.css">
+<style>
+  .CodeMirror { height: 300px; border: 1px solid #ccc; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<h2>Interlinear Gloss Editor</h2>
+<textarea id="editor">Juan	come 	Ø  	manzanas
+John	eats 	Ø  	apples
+Jean	mange	des	pommes
+> John eats apples</textarea>
+
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.14/lib/codemirror.js"></script>
+
+<script>
+  var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+    lineNumbers: false,
+    lineWrapping: false,
+    tabSize: 4,
+    indentWithTabs: true
+  });
+
+  function formatGloss(text) {
+    const lines = text.split('\n');
+
+    // Préparer les mots par colonne, mais seulement pour les lignes non ">"
+    const wordsLines = lines.map(line => {
+      if (line.startsWith('>')) return line; // on garde la ligne telle quelle
+      return line.split(/\s+/);
+    });
+
+    // Calculer la largeur des colonnes uniquement sur les lignes modifiables
+    const colWidths = [];
+    wordsLines.forEach(words => {
+      if (typeof words === 'string') return; // ignorer les lignes ">..."
+      words.forEach((word, i) => {
+        colWidths[i] = Math.max(colWidths[i] || 0, word.length);
+      });
+    });
+
+    // Formater les lignes
+    return wordsLines.map(words => {
+      if (typeof words === 'string') return words; // ligne ">" inchangée
+
+      let line = '';
+      words.forEach((word, i) => {
+        line += word;
+        if (i < words.length - 1) {
+          const padding = colWidths[i] - word.length;
+          line += ' '.repeat(padding) + '\t';
+        }
+      });
+      return line;
+    }).join('\n');
+  }
+
+
+
+  let timer;
+  editor.on("change", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const cur = editor.getValue();
+      const formatted = formatGloss(cur);
+
+      if (formatted !== cur) {
+        // Sauvegarde la position du curseur
+        const cursor = editor.getCursor();
+        const selections = editor.listSelections();
+
+        editor.setValue(formatted);
+
+        // Restaure la position du curseur / sélection
+        editor.setCursor(cursor);
+        editor.setSelections(selections);
+      }
+    }, 300);
+  });
+</script>
+
+</body>
+</html>
