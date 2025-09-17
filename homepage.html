@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mes outils HTML</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      margin: 20px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    #searchBar {
+      display: block;
+      margin: 0 auto 30px auto;
+      padding: 10px;
+      width: 80%;
+      max-width: 400px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .category {
+      margin-bottom: 30px;
+    }
+
+    .category h2 {
+      color: #333;
+      border-bottom: 2px solid #ccc;
+      padding-bottom: 5px;
+    }
+
+    .tool-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .tool-list li {
+      margin: 8px 0;
+    }
+
+    .tool-list a {
+      text-decoration: none;
+      color: #007BFF;
+    }
+
+    .tool-list a:hover {
+      text-decoration: underline;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Mes Outils HTML</h1>
+  <input type="text" id="searchBar" placeholder="Rechercher un outil...">
+
+  <div class="category">
+    <h2>Calendriers</h2>
+    <ul class="tool-list">
+      <li><a href="calendrier1.html">Calendrier Annuel</a></li>
+      <li><a href="calendrier2.html">Calendrier Éditable</a></li>
+    </ul>
+  </div>
+
+  <div class="category">
+    <h2>Convertisseurs</h2>
+    <ul class="tool-list">
+      <li><a href="convertisseur-texte.html">Convertisseur de texte</a></li>
+      <li><a href="convertisseur-mesures.html">Convertisseur de mesures</a></li>
+    </ul>
+  </div>
+
+  <div class="category">
+    <h2>Utilitaires</h2>
+    <ul class="tool-list">
+      <li><a href="editeur-html.html">Éditeur HTML</a></li>
+      <li><a href="compteur-mots.html">Compteur de mots</a></li>
+    </ul>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('searchBar');
+    const links = document.querySelectorAll('.tool-list li');
+
+    searchInput.addEventListener('input', function () {
+      const query = this.value.toLowerCase();
+
+      links.forEach(link => {
+        const text = link.textContent.toLowerCase();
+        if (text.includes(query)) {
+          link.classList.remove('hidden');
+        } else {
+          link.classList.add('hidden');
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
