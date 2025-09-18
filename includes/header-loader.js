@@ -1,6 +1,6 @@
 // header-loader.js
 document.addEventListener("DOMContentLoaded", () => {
-  fetch("./header.html")
+  fetch("/includes/header.html")
     .then(res => res.text())
     .then(html => {
       const temp = document.createElement("div");
