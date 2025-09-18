@@ -1,0 +1,36 @@
+<!-- header.html -->
+<header>
+  <div id="site-header">
+    <button id="menu-toggle" aria-label="Ouvrir le menu">
+      <!-- Icône hamburger SVG -->
+      <svg width="24" height="24" viewBox="0 0 24 24">
+        <rect y="4" width="24" height="2" />
+        <rect y="11" width="24" height="2" />
+        <rect y="18" width="24" height="2" />
+      </svg>
+    </button>
+
+    <a href="./index.html" id="logo-link">
+      <img src="./logo.png" alt="Mes outils" id="site-logo">
+    </a>
+  </div>
+
+  <!-- Barre latérale -->
+  <nav id="sidebar" class="hidden">
+    <button id="close-sidebar" aria-label="Fermer le menu">&times;</button>
+    <ul>
+      <li><a href="./index.html">🏠 Accueil</a></li>
+      <li><a href="./tools/calendar.html">📅 Calendriers</a></li>
+      <li><a href="./tools/editor.html">📝 Éditeurs</a></li>
+      <li>
+        <details>
+          <summary>🔧 Utilitaires</summary>
+          <ul>
+            <li><a href="./tools/word-counter.html">Compteur de mots</a></li>
+            <li><a href="./tools/text-converter.html">Convertisseur texte</a></li>
+          </ul>
+        </details>
+      </li>
+    </ul>
+  </nav>
+</header>
