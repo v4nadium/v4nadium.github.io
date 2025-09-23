@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>GML vers DXF avec reprojection EPSG:4326 → EPSG:2154</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.19.10/proj4.js"></script>
+</head>
+<body>
+  <h2>Extraire les emprises </h2>
+  <input type="file" id="fileInput" accept=".xml" />
+  <button id="exportBtn" disabled>Exporter en DXF</button>
+  <pre id="log" style="background:#eee;padding:1em;white-space:pre-wrap;"></pre>
+
+  <script>
+    // Définir la reprojection EPSG:4326 → EPSG:2154 (Lambert-93)
+    proj4.defs("EPSG:2154","+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 " +
+                          "+lon_0=3 +x_0=700000 +y_0=6600000 " +
+                          "+ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+
+    const fromProj = "EPSG:4326";
+    const toProj = "EPSG:2154";
+
+    let dxfData = "";
+
+    function writeDXFHeader() {
+      return `0
+SECTION
+2
+HEADER
+0
+ENDSEC
+0
+SECTION
+2
+TABLES
+0
+ENDSEC
+0
+SECTION
+2
+BLOCKS
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+`;
+    }
+
+    function writeDXFFooter() {
+      return `0
+ENDSEC
+0
+EOF`;
+    }
+
+    function writeDXFPolygon(coords) {
+      let output = "0\nLWPOLYLINE\n8\n0\n70\n1\n";
+      output += "90\n" + coords.length + "\n";
+      for (let pt of coords) {
+        output += "10\n" + pt[0].toFixed(3) + "\n20\n" + pt[1].toFixed(3) + "\n";
+      }
+      return output;
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(evt.target.result, "application/xml");
+        const log = document.getElementById('log');
+        log.textContent = "";
+
+        const coordsList = xmlDoc.getElementsByTagNameNS("http://www.opengis.net/gml/3.2", "coordinates");
+        if (coordsList.length === 0) {
+          log.textContent = "Aucune entité GML détectée.";
+          return;
+        }
+
+        dxfData = writeDXFHeader();
+
+        for (let i = 0; i < coordsList.length; i++) {
+          const coordText = coordsList[i].textContent.trim();
+          const pointsWGS84 = coordText.split(" ").map(p => p.split(",").map(Number));
+          const points2154 = pointsWGS84.map(p => proj4(fromProj, toProj, p));
+          dxfData += writeDXFPolygon(points2154);
+        }
+
+        dxfData += writeDXFFooter();
+
+        log.textContent = `Trouvé ${coordsList.length} polygone(s). Coordonnées reprojetées en EPSG:2154. Prêt à exporter.`;
+        document.getElementById('exportBtn').disabled = false;
+      };
+      reader.readAsText(file);
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', function() {
+      const blob = new Blob([dxfData], { type: "application/dxf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "export_lambert93.dxf";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
