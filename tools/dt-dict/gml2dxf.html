@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>GML vers DXF avec reprojection EPSG:4326 → EPSG:2154</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.19.10/proj4.js"></script>
-  <script src="/includes/header-loader.js" defer></script>
 </head>
 <body>
   <h2>Extraire les emprises </h2>
@@ -14,7 +13,7 @@
   <pre id="log" style="background:#eee;padding:1em;white-space:pre-wrap;"></pre>
 
   <button id="exportBtn" disabled>Exporter en DXF</button>
-  
+  <script src="/includes/header-loader.js" defer></script>
   <script>
     // Définir la reprojection EPSG:4326 → EPSG:2154 (Lambert-93)
     proj4.defs("EPSG:2154","+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 " +
