@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -62,85 +63,82 @@
 
   <h1>Mes Outils HTML</h1>
   <input type="text" id="searchBar" placeholder="Rechercher un outil...">
-
   <div id="toolContainer"></div>
 
   <script src="/includes/header-loader.js" defer></script>
-  
+
   <script>
-    // CSV avec Nom;Catégorie;Lien
-    const csvData = `
-Calendrier annuel;Calendriers;./tools/dates/calendrier.html
-Puissance 4;Jeux;./tools/jeux/puissance4.html
-Formateur de glose interlinéaire;Linguistique;./tools/ling/gloss-auto.html
-Extracteur d'emprise DT-DICT;Travaux publics;./tools/dt-dict/gml2dxf.html
-    `.trim();
+    async function loadToolsFromCSV(url) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Fichier CSV introuvable");
+        const csvText = await response.text();
 
-    const lines = csvData.split('\n');
-    const tools = lines.map(line => {
-      const [name, category, path] = line.split(';').map(s => s.trim());
-      return { name, category, path };
-    });
-
-    // Regrouper les outils par catégorie
-    const categories = {};
-    tools.forEach(tool => {
-      if (!categories[tool.category]) {
-        categories[tool.category] = [];
-      }
-      categories[tool.category].push(tool);
-    });
-
-    // Créer le HTML
-    const container = document.getElementById('toolContainer');
-    const sortedCategoryNames = Object.keys(categories).sort();
-
-    sortedCategoryNames.forEach(categoryName => {
-      const categoryDiv = document.createElement('div');
-      categoryDiv.className = 'category';
-
-      const h2 = document.createElement('h2');
-      h2.textContent = categoryName;
-      categoryDiv.appendChild(h2);
-
-      const ul = document.createElement('ul');
-      ul.className = 'tool-list';
-
-      const sortedTools = categories[categoryName].sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
-
-      sortedTools.forEach(tool => {
-        const li = document.createElement('li');
-        li.innerHTML = `<a href="${tool.path}">${tool.name}</a>`;
-        ul.appendChild(li);
-      });
-
-      categoryDiv.appendChild(ul);
-      container.appendChild(categoryDiv);
-    });
-
-    // Recherche
-    const searchInput = document.getElementById('searchBar');
-    searchInput.addEventListener('input', () => {
-      const query = searchInput.value.toLowerCase();
-
-      // Parcourir toutes les catégories
-      document.querySelectorAll('.category').forEach(categoryDiv => {
-        let anyVisible = false;
-
-        categoryDiv.querySelectorAll('li').forEach(li => {
-          const text = li.textContent.toLowerCase();
-          const match = text.includes(query);
-          li.style.display = match ? '' : 'none';
-          if (match) anyVisible = true;
+        const lines = csvText.trim().split('\n');
+        const tools = lines.map(line => {
+          const [name, category, path] = line.split(';').map(s => s.trim());
+          return { name, category, path };
         });
 
-        // Masquer la catégorie si aucun résultat
-        categoryDiv.style.display = anyVisible ? '' : 'none';
-      });
-    });
-  </script>
+        const categories = {};
+        tools.forEach(tool => {
+          if (!categories[tool.category]) {
+            categories[tool.category] = [];
+          }
+          categories[tool.category].push(tool);
+        });
 
+        const container = document.getElementById('toolContainer');
+        const sortedCategoryNames = Object.keys(categories).sort();
+
+        sortedCategoryNames.forEach(categoryName => {
+          const categoryDiv = document.createElement('div');
+          categoryDiv.className = 'category';
+
+          const h2 = document.createElement('h2');
+          h2.textContent = categoryName;
+          categoryDiv.appendChild(h2);
+
+          const ul = document.createElement('ul');
+          ul.className = 'tool-list';
+
+          const sortedTools = categories[categoryName].sort((a, b) =>
+            a.name.localeCompare(b.name)
+          );
+
+          sortedTools.forEach(tool => {
+            const li = document.createElement('li');
+            li.innerHTML = `<a href="${tool.path}">${tool.name}</a>`;
+            ul.appendChild(li);
+          });
+
+          categoryDiv.appendChild(ul);
+          container.appendChild(categoryDiv);
+        });
+
+        // Recherche
+        const searchInput = document.getElementById('searchBar');
+        searchInput.addEventListener('input', () => {
+          const query = searchInput.value.toLowerCase();
+          document.querySelectorAll('.category').forEach(categoryDiv => {
+            let anyVisible = false;
+            categoryDiv.querySelectorAll('li').forEach(li => {
+              const text = li.textContent.toLowerCase();
+              const match = text.includes(query);
+              li.style.display = match ? '' : 'none';
+              if (match) anyVisible = true;
+            });
+            categoryDiv.style.display = anyVisible ? '' : 'none';
+          });
+        });
+
+      } catch (error) {
+        console.error("Erreur de chargement :", error);
+        document.getElementById('toolContainer').textContent = "Erreur de chargement du fichier tools.csv.";
+      }
+    }
+
+    loadToolsFromCSV("/includes/tools.csv");
+  </script>
 </body>
 </html>
