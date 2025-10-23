@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Frise Chronologique</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    .composer-label {
+      font-size: 13px;
+      font-weight: bold;
+      pointer-events: none;
+      user-select: none;
+      paint-order: stroke;
+      stroke-width: 3px;
+      stroke-linejoin: round;
+      fill: white;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      margin-top: 10px;
+      font-family: monospace;
+    }
+    .controls {
+      margin-top: 10px;
+    }
+    .controls input {
+      width: 100px;
+      margin-right: 10px;
+    }
+    button {
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <svg width="1000"></svg>
+
+  <div>
+    <h4>Données (séparées par des « ; »)</h4>
+    <p>Format : <code>Étiquette ; début ; fin ; catégorie ; couleur (nom en anglais ou #RRGGBB)</code></p>
+    <textarea id="csvInput">Thalès;-624;-546;Philosophie naturelle;#1f77b4
+Héraclite;-535;-475;Philosophie naturelle;#1f77b4
+Parménide;-515;-450;Ontologie;#2ca02c
+Socrate;-469;-399;Éthique;#ff7f0e
+Platon;-427;-347;Métaphysique;#9467bd
+Aristote;-384;-322;Logique & Savoir;#8c564b
+Épicure;-341;-270;Bonheur & Morale;#e377c2
+Zénon;-334;-262;Stoïcisme;#17becf
+Sénèque;-4;65;Stoïcisme;#17becf
+Marc Aurèle;121;180;Stoïcisme;#17becf
+Augustin;354;430;Théologie chrétienne;#bcbd22
+Boèce;480;524;Théologie chrétienne;#bcbd22
+Avicenne;980;1037;Philosophie islamique;#7f7f7f
+Averroès;1126;1198;Philosophie islamique;#7f7f7f
+Maïmonide;1138;1204;Philosophie juive;#c49c94
+St Thomas d’Aquin;1225;1274;Théologie chrétienne;#bcbd22</textarea>
+  </div>
+
+
+  <div class="controls">
+    <h3>Paramètres de la frise</h3>
+    <label>Début : <input type="number" id="startYear" value="-650"></label>
+    <label>Fin : <input type="number" id="endYear" value="1400"></label>
+    <label>Intervalle des graduations : <input type="number" id="tickInterval" value="100"></label>
+    <label>Largeur de la frise : <input type="number" id="timelineWidth" value="1000"></label>
+  </div>
+
+
+  <div class="controls">
+    <button id="updateBtn">Mettre à jour la frise</button>
+  </div>
+
+  <script>
+    const svg = d3.select("svg");
+    const margin = { top: 40, right: 20, bottom: 40, left: 60 };
+    const width = +document.getElementById("timelineWidth").value;
+
+    // Fonction principale : (re)dessiner la frise
+    function drawTimeline() {
+      const startYear = +document.getElementById("startYear").value;
+      const endYear = +document.getElementById("endYear").value;
+      const tickInterval = +document.getElementById("tickInterval").value;
+      const csvText = document.getElementById("csvInput").value.trim();
+
+
+      const csvData = "composer;birth;death;theme;color\n" + csvText;
+
+      const data = d3.dsvFormat(";").parse(csvData, d => ({
+        name: d.composer,
+        birth: +d.birth,
+        death: +d.death,
+        theme: d.theme,
+        color: d.color
+      }));
+
+      // Nettoyer le SVG avant de redessiner
+      svg.selectAll("*").remove();
+
+      const innerWidth = width - margin.left - margin.right;
+
+      const x = d3.scaleLinear()
+        .domain([startYear, endYear])
+        .range([0, innerWidth]);
+
+      const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const textMeasure = g.append("g").attr("class", "text-measure").style("visibility", "hidden");
+      function getTextWidth(text) {
+        const tempText = textMeasure.append("text").text(text).attr("font-size", 13);
+        const w = tempText.node().getBBox().width;
+        tempText.remove();
+        return w;
+      }
+
+      // Placement intelligent dans des "lanes"
+      const lanes = [];
+      data.forEach(d => {
+        const labelStartX = x(d.birth);
+        const labelWidth = getTextWidth(d.name);
+        const labelEndX = labelStartX + labelWidth + 5;
+
+        let placed = false;
+        for (let i = 0; i < lanes.length; i++) {
+          const last = lanes[i][lanes[i].length - 1];
+          const lastLabelStartX = x(last.birth);
+          const lastLabelWidth = getTextWidth(last.name);
+          const lastLabelEndX = lastLabelStartX + lastLabelWidth + 5;
+          if ((d.birth > last.death) && (labelStartX > lastLabelEndX)) {
+            lanes[i].push(d);
+            d.lane = i;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          d.lane = lanes.length;
+          lanes.push([d]);
+        }
+      });
+
+      const rowHeight = 30;
+      const height = lanes.length * rowHeight + margin.top + margin.bottom;
+      svg.attr("height", height);
+
+      const y = d3.scaleBand()
+        .domain(d3.range(lanes.length))
+        .range([0, lanes.length * rowHeight])
+        .padding(0.4);
+
+      // Axe X avec intervalle réglable
+      g.append("g")
+        .attr("transform", "translate(0,0)")
+        .call(d3.axisTop(x)
+          .ticks((endYear - startYear) / tickInterval)
+          .tickFormat(d => d)
+        );
+
+      // Grille verticale
+      g.append("g")
+        .attr("class", "grid")
+        .call(
+          d3.axisTop(x)
+            .ticks((endYear - startYear) / tickInterval)
+            .tickSize(-lanes.length * rowHeight)
+            .tickFormat("")
+        )
+        .selectAll("line")
+        .attr("stroke", "#ccc")
+        .attr("stroke-dasharray", "2,2");
+
+      // Barres
+      g.selectAll("rect")
+        .data(data)
+        .join("rect")
+        .attr("x", d => x(d.birth))
+        .attr("y", d => y(d.lane))
+        .attr("width", d => x(d.death) - x(d.birth))
+        .attr("height", y.bandwidth())
+        .attr("fill", d => d.color)
+        .attr("opacity", 0.7);
+
+      // Labels
+      g.selectAll(".composer-label")
+        .data(data)
+        .join("text")
+        .attr("class", "composer-label")
+        .attr("x", d => x(d.birth) + 5)
+        .attr("y", d => y(d.lane) + y.bandwidth() / 2 + 5)
+        .attr("stroke", d => d.color)
+        .text(d => d.name);
+
+      const requiredWidth = d3.max(data, d => x(d.death) + getTextWidth(d.name));
+      svg.attr("width", Math.max(requiredWidth + margin.left + margin.right, width));
+    }
+
+    // Premier rendu
+    drawTimeline();
+
+    // Bouton de mise à jour
+    document.getElementById("updateBtn").addEventListener("click", drawTimeline);
+  </script>
+</body>
+</html>
