@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Load & Filter GeoJSON (with area and count)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script type="module">
+  import pako from "https://cdn.jsdelivr.net/npm/pako@2.1.0/+esm";
+  import * as turf from "https://cdn.jsdelivr.net/npm/@turf/turf@7/+esm";
+
+  let geojsonData;
+  let geojsonLayer;
+  let map;
+
+  async function loadData(url) {
+    try {
+      const response = await fetch(url);
+      const buf = new Uint8Array(await response.arrayBuffer());
+      let text;
+
+      // Try to detect gzip magic header (0x1f, 0x8b)
+      if (buf[0] === 0x1f && buf[1] === 0x8b) {
+        text = pako.ungzip(buf, { to: "string" });
+      } else {
+        text = new TextDecoder("utf-8").decode(buf);
+      }
+
+      geojsonData = JSON.parse(text);
+
+      // 🧮 Compute area (m²)
+      geojsonData.features.forEach(f => {
+        try {
+          const area = turf.area(f);
+          f.properties.area_m2 = area;
+        } catch {
+          f.properties.area_m2 = null;
+        }
+      });
+
+      initMap();
+      initControls();
+      renderFiltered();
+      document.getElementById("status").textContent = "✅ Data loaded successfully.";
+    } catch (err) {
+      console.error(err);
+      document.getElementById("status").textContent = "❌ Failed to load file (check URL or CORS).";
+    }
+  }
+
+  function initMap() {
+    if (map) {
+      map.remove(); // reset if reloading
+    }
+    map = L.map("map").setView([0, 0], 2);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors"
+    }).addTo(map);
+  }
+
+  function initControls() {
+    const fields = Object.keys(geojsonData.features[0].properties);
+    if (!fields.includes("area_m2")) fields.push("area_m2");
+
+    const select = document.getElementById("fieldSelect");
+    select.innerHTML = fields.map(f => `<option value="${f}">${f}</option>`).join("");
+    document.getElementById("applyFilter").addEventListener("click", renderFiltered);
+  }
+
+  function renderFiltered() {
+    const field = document.getElementById("fieldSelect").value;
+    const minVal = parseFloat(document.getElementById("minValue").value);
+    const maxVal = parseFloat(document.getElementById("maxValue").value);
+
+    const filtered = {
+      type: "FeatureCollection",
+      features: geojsonData.features.filter(f => {
+        const val = parseFloat(f.properties[field]);
+        if (isNaN(val)) return false;
+        if (!isNaN(minVal) && val < minVal) return false;
+        if (!isNaN(maxVal) && val > maxVal) return false;
+        return true;
+      })
+    };
+
+    document.getElementById("countDisplay").textContent = `Count: ${filtered.features.length}`;
+
+    if (geojsonLayer) map.removeLayer(geojsonLayer);
+
+    geojsonLayer = L.geoJSON(filtered, {
+      style: { color: "#0074D9", weight: 1, fillOpacity: 0.4 },
+      onEachFeature: (f, layer) => {
+        const props = f.properties;
+        layer.bindPopup(`
+          <b>${field}</b>: ${props[field]}<br>
+          <b>area_m2</b>: ${props.area_m2 ? props.area_m2.toFixed(2) : "N/A"}<br>
+          ${Object.entries(props)
+            .map(([k, v]) => `<b>${k}</b>: ${v}`)
+            .join("<br>")}
+        `);
+      }
+    }).addTo(map);
+
+    if (filtered.features.length > 0)
+      map.fitBounds(geojsonLayer.getBounds());
+  }
+
+  // 🚀 Handle Load button
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("loadButton").addEventListener("click", () => {
+      const url = document.getElementById("geojsonUrl").value.trim();
+      if (url) {
+        document.getElementById("status").textContent = "⏳ Loading...";
+        loadData(url);
+      }
+    });
+  });
+  </script>
+
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      font-family: sans-serif;
+    }
+    #topbar, #controls {
+      background: #f0f0f0;
+      padding: 0.5em;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em;
+      align-items: center;
+    }
+    #controls {
+      border-top: 1px solid #ccc;
+      border-bottom: none;
+    }
+    input, select, button {
+      padding: 0.3em 0.5em;
+      font-size: 1em;
+    }
+    label { display: flex; align-items: center; gap: 0.3em; }
+    #map { flex: 1; }
+    #status {
+      font-size: 0.9em;
+      color: #333;
+    }
+    #countDisplay {
+      font-weight: bold;
+      margin-left: 0.5em;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <!-- 🔗 URL input -->
+  <div id="topbar">
+    <label>GeoJSON URL:
+      <input type="text" id="geojsonUrl" size="80" value="https://cadastre.data.gouv.fr/data/etalab-cadastre/2025-09-01/geojson/communes/66/66227/cadastre-66227-parcelles.json.gz">
+    </label>
+    <button id="loadButton">Load</button>
+    <span id="status"></span>
+  </div>
+
+  <!-- 🗺️ Map -->
+  <div id="map"></div>
+
+  <!-- ⚙️ Filter controls -->
+  <div id="controls">
+    <label>Field:
+      <select id="fieldSelect"></select>
+    </label>
+    <label>Min:
+      <input type="number" id="minValue" placeholder="min">
+    </label>
+    <label>Max:
+      <input type="number" id="maxValue" placeholder="max">
+    </label>
+    <button id="applyFilter">Apply filter</button>
+    <span id="countDisplay">Count: 0</span>
+  </div>
+</body>
+</html>
