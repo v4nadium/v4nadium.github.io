@@ -5,3 +5,4 @@ Formateur de glose interlinéaire;Linguistique;./tools/ling/gloss-auto.html
 Extracteur d'emprise DT-DICT;Travaux publics;./tools/dt-dict/gml2dxf.html
 Conversion de données géographiques;Géo;https://gdal3.js.org/
 Trouver une parcelle;Géo;./tools/geo/maisontrouve.html
+DVF (Demande de Valeur Foncière);Géo;https://app.dvf.etalab.gouv.fr/
