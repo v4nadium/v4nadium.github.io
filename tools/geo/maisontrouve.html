@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="UTF-8" />
   <title>Trouver une maison par surface parcelle et bâti</title>
@@ -17,41 +17,86 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     initMap();
-    initUI("A");
-    initUI("B");
+    initUI();
   });
 
   function initMap() {
-    map = L.map("map").setView([0, 0], 2);
+    map = L.map("map").setView([46.6, 2.5], 6);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors"
     }).addTo(map);
   }
 
-  function initUI(id) {
-    document.getElementById(`loadButton_${id}`).addEventListener("click", () => {
-      const url = document.getElementById(`geojsonUrl_${id}`).value.trim();
-      if (url) {
-        document.getElementById(`status_${id}`).textContent = "⏳ Chargement...";
-        loadData(id, url);
-      }
+  function initUI() {
+    const searchInput = document.getElementById("communeInput");
+    const resultsDiv = document.getElementById("results");
+
+    let timeout = null;
+
+    searchInput.addEventListener("input", async () => {
+      const q = searchInput.value.trim();
+      resultsDiv.innerHTML = "";
+      if (q.length < 3) return;
+
+      clearTimeout(timeout);
+      timeout = setTimeout(async () => {
+        try {
+          const url = `https://tabular-api.data.gouv.fr/api/resources/dbe8a621-a9c4-4bc3-9cae-be1699c5ff25/data/json/?page=1&page_size=5&nom_commune__contains=${encodeURIComponent(q)}`;
+          const response = await fetch(url);
+          const data = await response.json();
+          const communes = data.results || data; // compatibilité éventuelle
+          resultsDiv.innerHTML = "";
+
+          if (communes.length === 1) {
+            selectCommune(communes[0]);
+          } else {
+            communes.forEach(c => {
+              const item = document.createElement("div");
+              item.className = "result-item";
+              item.textContent = c.nom_commune_complet;
+              item.addEventListener("click", () => selectCommune(c));
+              resultsDiv.appendChild(item);
+            });
+          }
+        } catch (err) {
+          console.error("Erreur API commune:", err);
+        }
+      }, 300);
     });
-    document.getElementById(`applyFilter_${id}`).addEventListener("click", () => renderFiltered(id));
+
+    document.getElementById("loadButton").addEventListener("click", () => {
+      const code = document.getElementById("codeInsee").value;
+      if (code) loadBothDatasets(code);
+    });
+  }
+
+  function selectCommune(c) {
+    document.getElementById("communeInput").value = c.nom_commune_complet;
+    document.getElementById("results").innerHTML = "";
+    document.getElementById("codeInsee").value = c.code_commune_INSEE;
+    document.getElementById("loadButton").click();
+  }
+
+  async function loadBothDatasets(code) {
+    const urls = {
+      A: `https://cadastre.data.gouv.fr/data/etalab-cadastre/latest/geojson/communes/${code.substring(0,2)}/${code}/cadastre-${code}-parcelles.json.gz`,
+      B: `https://cadastre.data.gouv.fr/data/etalab-cadastre/latest/geojson/communes/${code.substring(0,2)}/${code}/cadastre-${code}-batiments.json.gz`
+    };
+    loadData("A", urls.A);
+    loadData("B", urls.B);
   }
 
   async function loadData(id, url) {
     try {
+      document.getElementById(`status_${id}`).textContent = "⏳ Chargement...";
       const response = await fetch(url);
       const buf = new Uint8Array(await response.arrayBuffer());
       let text;
-
-      // detect gzip magic number
       if (buf[0] === 0x1f && buf[1] === 0x8b) text = pako.ungzip(buf, { to: "string" });
       else text = new TextDecoder("utf-8").decode(buf);
 
       const geojsonData = JSON.parse(text);
 
-      // compute area
       geojsonData.features.forEach(f => {
         try {
           const area = turf.area(f);
@@ -120,89 +165,69 @@
   </script>
 
   <style>
-    body {
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      font-family: sans-serif;
-    }
+    body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
     #map { flex: 1; }
-    .topbar, .controls {
-      background: #f0f0f0;
-      padding: 0.5em;
-      border-bottom: 1px solid #ccc;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5em;
-      align-items: center;
+    #search {
+      background: #f0f0f0; padding: 0.5em; border-bottom: 2px solid #999;
+      position: relative;
+    }
+    #results {
+      position: absolute;
+      background: white;
+      border: 1px solid #ccc;
+      max-height: 200px;
+      overflow-y: auto;
+      width: 300px;
+      z-index: 1000;
+    }
+    .result-item {
+      padding: 0.3em 0.5em;
+      cursor: pointer;
+    }
+    .result-item:hover {
+      background: #def;
     }
     .controls {
-      border-top: 1px solid #ccc;
-      border-bottom: none;
+      background: #f8f8f8; padding: 0.5em; border-top: 1px solid #ccc;
+      display: flex; flex-wrap: wrap; gap: 0.5em; align-items: center;
     }
     input, select, button { padding: 0.3em 0.5em; font-size: 1em; }
-    label { display: flex; align-items: center; gap: 0.3em; }
-    .status { font-size: 0.9em; color: #333; }
-    .countDisplay { font-weight: bold; margin-left: 0.5em; color: #333; }
-    .section {
-      border-bottom: 2px solid #aaa;
-    }
+    .countDisplay { font-weight: bold; margin-left: 0.5em; }
   </style>
 </head>
 <body>
 
-  <!-- 🔵 DATASET A -->
-  <div class="section" id="sectionA">
-    <div class="topbar">
-      <strong>Parcelles :</strong>
-      <label>URL:
-        <input type="text" id="geojsonUrl_A" size="80" value="https://cadastre.data.gouv.fr/data/etalab-cadastre/2025-09-01/geojson/communes/66/66227/cadastre-66227-parcelles.json.gz">
-      </label>
-      <button id="loadButton_A">Charger les données</button>
-      <span class="status" id="status_A"></span>
-    </div>
-    <div class="controls">
-      <label>Valeur :
-        <select id="fieldSelect_A"></select>
-      </label>
-      <label>Min:
-        <input type="number" id="minValue_A" placeholder="min" value="150">
-      </label>
-      <label>Max:
-        <input type="number" id="maxValue_A" placeholder="max" value="200">
-      </label>
-      <button id="applyFilter_A">Filtrer</button>
-      <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
-    </div>
+  <div id="search">
+    <label>Commune :
+      <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." size="40">
+    </label>
+    <button id="loadButton">Charger les données</button>
+    <input type="hidden" id="codeInsee">
+    <div id="results"></div>
   </div>
 
-  <!-- 🔴 DATASET B -->
-  <div class="section" id="sectionB">
-    <div class="topbar">
-      <strong>Bâtiments :</strong>
-      <label>URL:
-        <input type="text" id="geojsonUrl_B" size="80" value="https://cadastre.data.gouv.fr/data/etalab-cadastre/2025-09-01/geojson/communes/66/66227/cadastre-66227-batiments.json.gz">
-      </label>
-      <button id="loadButton_B">Charger les données</button>
-      <span class="status" id="status_B"></span>
-    </div>
-    <div class="controls">
-      <label>Valeur :
-        <select id="fieldSelect_B"></select>
-      </label>
-      <label>Min:
-        <input type="number" id="minValue_B" placeholder="min" vallue="75">
-      </label>
-      <label>Max:
-        <input type="number" id="maxValue_B" placeholder="max" value="100">
-      </label>
-      <button id="applyFilter_B">Filtrer</button>
-      <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
-    </div>
+  <!-- Parcelles -->
+  <div class="controls">
+    <strong>Parcelles :</strong>
+    <label>Valeur : <select id="fieldSelect_A"></select></label>
+    <label>Min: <input type="number" id="minValue_A" placeholder="min" value="150"></label>
+    <label>Max: <input type="number" id="maxValue_A" placeholder="max" value="200"></label>
+    <button id="applyFilter_A" onclick="renderFiltered('A')">Filtrer</button>
+    <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
+    <span class="status" id="status_A"></span>
   </div>
 
-  <!-- 🗺️ MAP -->
+  <!-- Bâtiments -->
+  <div class="controls">
+    <strong>Bâtiments :</strong>
+    <label>Valeur : <select id="fieldSelect_B"></select></label>
+    <label>Min: <input type="number" id="minValue_B" placeholder="min" value="75"></label>
+    <label>Max: <input type="number" id="maxValue_B" placeholder="max" value="100"></label>
+    <button id="applyFilter_B" onclick="renderFiltered('B')">Filtrer</button>
+    <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
+    <span class="status" id="status_B"></span>
+  </div>
+
   <div id="map"></div>
 
 </body>
