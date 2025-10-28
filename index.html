@@ -87,7 +87,7 @@
 
         const lines = csvText.trim().split('\n');
         const tools = lines.map(line => {
-          const [name, category, path] = line.split(';').map(s => s.trim());
+          const [name, category, path] = line.split(',').map(s => s.trim());
           return { name, category, path };
         });
 
