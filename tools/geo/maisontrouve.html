@@ -30,7 +30,7 @@
 
     /* Bloc repliable */
     #controlContainer {
-      transition: max-height 0.3s ease, opacity 0.3s ease;
+      transition: max-height 0.3s ease, opacity 0.25s ease;
       overflow: hidden;
       max-height: 1000px;
       opacity: 1;
@@ -57,6 +57,7 @@
     select, input[type="number"], button { padding:0.45em 0.5em; font-size:1rem; }
     input[type="number"] { width: 5em; }
     .countDisplay { font-weight:bold; color:#333; margin-left:0.5em; }
+    .hidden { display: none; }
 
     /* Mobile */
     @media (max-width:640px) {
@@ -152,12 +153,30 @@
       if (code) loadBothDatasets(code);
     });
 
-    // bouton de repli
+    // bouton de repli : UN seul gestionnaire, correct
     const toggleBtn = document.getElementById("toggleButton");
     const container = document.getElementById("controlContainer");
     toggleBtn.addEventListener("click", () => {
-      container.classList.toggle("collapsed");
-      toggleBtn.textContent = container.classList.contains("collapsed") ? "▶️" : "▼";
+      const nowCollapsed = container.classList.toggle("collapsed");
+      toggleBtn.textContent = nowCollapsed ? "▶️" : "▼";
+
+      // attendre la fin de l'animation puis invalider la taille de la carte
+      setTimeout(() => {
+        try { map.invalidateSize({ pan: false }); } catch (e) { /* ignore */ }
+
+        // recentrer sur les données visibles si souhaité
+        const bounds =
+          (datasets.A.layer && datasets.A.layer.getBounds && datasets.A.layer.getBounds()) ||
+          (datasets.B.layer && datasets.B.layer.getBounds && datasets.B.layer.getBounds());
+        if (bounds && bounds.isValid && bounds.isValid()) {
+          try { map.fitBounds(bounds); } catch (e) { /* ignore fit errors */ }
+        }
+      }, 350); // légèrement supérieur à la transition CSS (0.3s)
+    });
+
+    // aussi invalider sur resize (utile pour rotation écran mobile)
+    window.addEventListener("resize", () => {
+      setTimeout(() => { try { map.invalidateSize({ pan: false }); } catch(e){} }, 200);
     });
   });
 
@@ -246,8 +265,8 @@
     document.getElementById("status_A").textContent = "⏳ Chargement...";
     document.getElementById("status_B").textContent = "⏳ Chargement...";
     await Promise.allSettled([loadData("A", urls.A), loadData("B", urls.B)]);
-    if (datasets.A.layer) map.fitBounds(datasets.A.layer.getBounds());
-    else if (datasets.B.layer) map.fitBounds(datasets.B.layer.getBounds());
+    if (datasets.A.layer) { map.fitBounds(datasets.A.layer.getBounds()); map.invalidateSize(); }
+    else if (datasets.B.layer) { map.fitBounds(datasets.B.layer.getBounds()); map.invalidateSize(); }
   }
 
   async function loadData(id, url) {
@@ -306,6 +325,9 @@
         layer.bindPopup(`<b>${field}</b>: ${p[field]}<br><b>area_m2</b>: ${p.area_m2 ? p.area_m2.toFixed(2) : "N/A"}`);
       }
     }).addTo(map);
+
+    // IMPORTANT : forcer Leaflet à recalculer et afficher correctement la couche
+    try { map.invalidateSize({ pan: false }); } catch (e) { /* ignore */ }
   }
   </script>
 </body>
