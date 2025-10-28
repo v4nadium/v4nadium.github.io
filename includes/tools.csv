@@ -6,3 +6,4 @@ Extracteur d'emprise DT-DICT;Travaux publics;./tools/dt-dict/gml2dxf.html
 Conversion de données géographiques;Géo;https://gdal3.js.org/
 Trouver une parcelle;Géo;./tools/geo/maisontrouve.html
 DVF (Demande de Valeur Foncière);Géo;https://app.dvf.etalab.gouv.fr/
+PLU (Géoportail de l'urbanisme);Géo;https://www.geoportail-urbanisme.gouv.fr/map/#tile=1&lon=2&lat=46&zoom=6
