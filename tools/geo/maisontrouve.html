@@ -2,7 +2,8 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Trouver une maison par surface parcelle et bâti</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trouver une maison par surface</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script type="module">
@@ -30,7 +31,6 @@
   function initUI() {
     const searchInput = document.getElementById("communeInput");
     const resultsDiv = document.getElementById("results");
-
     let timeout = null;
 
     searchInput.addEventListener("input", async () => {
@@ -41,10 +41,10 @@
       clearTimeout(timeout);
       timeout = setTimeout(async () => {
         try {
-          const url = `https://tabular-api.data.gouv.fr/api/resources/dbe8a621-a9c4-4bc3-9cae-be1699c5ff25/data/json/?page=1&page_size=5&nom_commune__contains=${encodeURIComponent(q)}`;
+          const url = `https://tabular-api.data.gouv.fr/api/resources/dbe8a621-a9c4-4bc3-9cae-be1699c5ff25/data/json/?page=1&page_size=20&nom_commune__contains=${encodeURIComponent(q)}`;
           const response = await fetch(url);
           const data = await response.json();
-          const communes = data.results || data; // compatibilité éventuelle
+          const communes = data.results || data;
           resultsDiv.innerHTML = "";
 
           if (communes.length === 1) {
@@ -67,6 +67,13 @@
     document.getElementById("loadButton").addEventListener("click", () => {
       const code = document.getElementById("codeInsee").value;
       if (code) loadBothDatasets(code);
+    });
+
+    document.querySelectorAll(".toggle").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const target = btn.nextElementSibling;
+        target.classList.toggle("collapsed");
+      });
     });
   }
 
@@ -98,12 +105,7 @@
       const geojsonData = JSON.parse(text);
 
       geojsonData.features.forEach(f => {
-        try {
-          const area = turf.area(f);
-          f.properties.area_m2 = area;
-        } catch {
-          f.properties.area_m2 = null;
-        }
+        try { f.properties.area_m2 = turf.area(f); } catch { f.properties.area_m2 = null; }
       });
 
       datasets[id].data = geojsonData;
@@ -112,7 +114,7 @@
       renderFiltered(id);
     } catch (err) {
       console.error(err);
-      document.getElementById(`status_${id}`).textContent = "❌ Erreur de chargement.";
+      document.getElementById(`status_${id}`).textContent = "❌ Erreur.";
     }
   }
 
@@ -152,11 +154,8 @@
       style: { color: ds.color, weight: 1, fillOpacity: 0.4 },
       onEachFeature: (f, layer) => {
         const props = f.properties;
-        layer.bindPopup(
-          `<b>${field}</b>: ${props[field]}<br>` +
-          `<b>area_m2</b>: ${props.area_m2 ? props.area_m2.toFixed(2) : "N/A"}<br>` +
-          Object.entries(props).map(([k, v]) => `<b>${k}</b>: ${v}`).join("<br>")
-        );
+        layer.bindPopup(`<b>${field}</b>: ${props[field]}<br>
+          <b>area_m2</b>: ${props.area_m2 ? props.area_m2.toFixed(2) : "N/A"}`);
       }
     }).addTo(map);
 
@@ -167,68 +166,102 @@
   <style>
     body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
     #map { flex: 1; }
+
     #search {
-      background: #f0f0f0; padding: 0.5em; border-bottom: 2px solid #999;
+      background: #f0f0f0;
+      padding: 0.5em;
+      border-bottom: 2px solid #999;
       position: relative;
     }
     #results {
       position: absolute;
       background: white;
       border: 1px solid #ccc;
-      max-height: 200px;
+      max-height: 180px;
       overflow-y: auto;
-      width: 300px;
+      width: calc(100% - 2em);
       z-index: 1000;
     }
-    .result-item {
-      padding: 0.3em 0.5em;
+    .result-item { padding: 0.4em; cursor: pointer; }
+    .result-item:hover { background: #def; }
+
+    .controls {
+      background: #fafafa;
+      padding: 0.5em;
+      border-top: 1px solid #ccc;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em;
+      align-items: center;
+      transition: max-height 0.3s ease;
+    }
+
+    .controls.collapsed {
+      max-height: 0;
+      overflow: hidden;
+      padding: 0;
+      border: none;
+    }
+
+    button, input, select {
+      font-size: 1em;
+      padding: 0.4em 0.6em;
+    }
+
+    .toggle {
+      width: 100%;
+      text-align: left;
+      font-weight: bold;
+      background: #ddd;
+      border: none;
+      padding: 0.5em;
       cursor: pointer;
     }
-    .result-item:hover {
-      background: #def;
+
+    @media (max-width: 600px) {
+      #search {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4em;
+      }
+      input, select, button {
+        width: 100%;
+      }
+      .toggle {
+        font-size: 1.1em;
+      }
     }
-    .controls {
-      background: #f8f8f8; padding: 0.5em; border-top: 1px solid #ccc;
-      display: flex; flex-wrap: wrap; gap: 0.5em; align-items: center;
-    }
-    input, select, button { padding: 0.3em 0.5em; font-size: 1em; }
-    .countDisplay { font-weight: bold; margin-left: 0.5em; }
   </style>
 </head>
 <body>
 
   <div id="search">
     <label>Commune :
-      <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." size="40">
+      <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." />
     </label>
     <button id="loadButton">Charger les données</button>
-    <input type="hidden" id="codeInsee">
+    <input type="hidden" id="codeInsee" />
     <div id="results"></div>
   </div>
 
-  <!-- Parcelles -->
-  <div class="controls">
-    <strong>Parcelles :</strong>
+  <button class="toggle">🟦 Parcelles ▼</button>
+  <div class="controls" id="controls_A">
     <label>Valeur : <select id="fieldSelect_A"></select></label>
-    <label>Min: <input type="number" id="minValue_A" placeholder="min" value="150"></label>
-    <label>Max: <input type="number" id="maxValue_A" placeholder="max" value="200"></label>
-    <button id="applyFilter_A" onclick="renderFiltered('A')">Filtrer</button>
-    <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
-    <span class="status" id="status_A"></span>
+    <label>Min: <input type="number" id="minValue_A" value="150"></label>
+    <label>Max: <input type="number" id="maxValue_A" value="200"></label>
+    <button onclick="renderFiltered('A')">Filtrer</button>
+    <span id="countDisplay_A"></span><span id="status_A"></span>
   </div>
 
-  <!-- Bâtiments -->
-  <div class="controls">
-    <strong>Bâtiments :</strong>
+  <button class="toggle">🟥 Bâtiments ▼</button>
+  <div class="controls" id="controls_B">
     <label>Valeur : <select id="fieldSelect_B"></select></label>
-    <label>Min: <input type="number" id="minValue_B" placeholder="min" value="75"></label>
-    <label>Max: <input type="number" id="maxValue_B" placeholder="max" value="100"></label>
-    <button id="applyFilter_B" onclick="renderFiltered('B')">Filtrer</button>
-    <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
-    <span class="status" id="status_B"></span>
+    <label>Min: <input type="number" id="minValue_B" value="75"></label>
+    <label>Max: <input type="number" id="maxValue_B" value="100"></label>
+    <button onclick="renderFiltered('B')">Filtrer</button>
+    <span id="countDisplay_B"></span><span id="status_B"></span>
   </div>
 
   <div id="map"></div>
-
 </body>
 </html>
