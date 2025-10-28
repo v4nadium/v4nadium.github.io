@@ -8,14 +8,42 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
   <style>
-    /* Layout général */
     body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
     #map { flex: 1; min-height: 200px; }
+
+    /* Barre principale et bouton replier */
+    #header {
+      background: #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.4em 0.6em;
+      border-bottom: 2px solid #999;
+    }
+    #toggleButton {
+      background: none;
+      border: none;
+      font-size: 1.2em;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    /* Bloc repliable */
+    #controlContainer {
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      overflow: hidden;
+      max-height: 1000px;
+      opacity: 1;
+    }
+    #controlContainer.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
 
     /* Recherche */
     #search { background: #f0f0f0; padding: 0.5em; border-bottom: 2px solid #999; position: relative; }
     #search-row { display:flex; gap:0.5em; align-items:center; flex-wrap:wrap; }
-    #communeInput { flex: 1 1 240px; min-width: 120px; padding:0.5em; font-size:1rem; }
+    #communeInput { flex: 1 1; min-width: 120px; padding:0.5em; font-size:1rem; }
     #loadButton { padding:0.5em 0.75em; font-size:1rem; }
 
     /* résultats autocomplete */
@@ -27,67 +55,77 @@
     .controls { display:flex; gap:0.5em; align-items:center; padding:0.5em; background:#fafafa; border-top:1px solid #ddd; flex-wrap:wrap; }
     .controls label { display:flex; align-items:center; gap:0.4em; }
     select, input[type="number"], button { padding:0.45em 0.5em; font-size:1rem; }
-
+    input[type="number"] { width: 5em; }
     .countDisplay { font-weight:bold; color:#333; margin-left:0.5em; }
 
-    /* Mobile-friendly: stack controls */
+    /* Mobile */
     @media (max-width:640px) {
-      #search-row { flex-direction: column; align-items: stretch; }
-      .controls { flex-direction: column; align-items: stretch; }
+      #search-row { flex-direction: row; align-items: flex-start; }
+      .controls { flex-direction: row; align-items: flex-start; }
       #results { width: calc(100% - 1em); left:0.5em; right:0.5em; }
-      .controls > * { width: 100%; }
-      button { width: 100%; }
+      /*.controls > * { width: 100%; }*/
+      /*button { width: 100%; }*/
     }
   </style>
 </head>
 <body>
 
-  <!-- Recherche par nom de commune -->
-  <div id="search">
-    <div id="search-row">
-      <label style="font-weight:600;">Commune :</label>
-      <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." aria-label="Commune">
-      <button id="loadButton" aria-label="Charger les données">Charger les données</button>
-      <input type="hidden" id="codeInsee" />
-      <span id="status_global" style="margin-left:0.5em;"></span>
+  <!-- 🧭 Barre supérieure avec bouton de repli -->
+  <div id="header">
+    <strong>Trouver une maison</strong>
+    <button id="toggleButton" title="Replier les contrôles">▼</button>
+  </div>
+
+  <!-- 🧩 Bloc repliable contenant les contrôles -->
+  <div id="controlContainer">
+    <!-- Recherche par nom de commune -->
+    <div id="search">
+      <div id="search-row">
+        <label style="font-weight:600;">Commune :</label>
+        <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." aria-label="Commune">
+        <button id="loadButton" aria-label="Charger les données">Charger les données</button>
+        <input type="hidden" id="codeInsee" />
+        <span id="status_global" style="margin-left:0.5em;"></span>
+      </div>
+      <div id="results" aria-live="polite"></div>
     </div>
-    <div id="results" aria-live="polite"></div>
+
+    <!-- Parcelles -->
+    <div class="controls" id="controlsA">
+      <strong>Parcelles</strong>
+      <label>Champ :
+        <select id="fieldSelect_A"></select>
+      </label>
+      <label>Min :
+        <input type="number" id="minValue_A" placeholder="min" value="150" size="5">
+      </label>
+      <label>Max :
+        <input type="number" id="maxValue_A" placeholder="max" value="200" size="5">
+      </label>
+      <button id="applyFilter_A">Filtrer</button>
+      <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
+      <span class="status" id="status_A" style="margin-left:auto"></span>
+    </div>
+
+    <!-- Bâtiments -->
+    <div class="controls" id="controlsB">
+      <strong>Bâtiments</strong>
+      <label>Champ :
+        <select id="fieldSelect_B"></select>
+      </label>
+      <label>Min :
+        <input type="number" id="minValue_B" placeholder="min" value="75" size="5">
+      </label>
+      <label>Max :
+        <input type="number" id="maxValue_B" placeholder="max" value="100" size="5">
+      </label>
+      <button id="applyFilter_B">Filtrer</button>
+      <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
+      <span class="status" id="status_B" style="margin-left:auto"></span>
+    </div>
   </div>
 
-  <!-- Parcelles -->
-  <div class="controls" id="controlsA">
-    <strong>Parcelles</strong>
-    <label>Champ :
-      <select id="fieldSelect_A"></select>
-    </label>
-    <label>Min :
-      <input type="number" id="minValue_A" placeholder="min" value="150">
-    </label>
-    <label>Max :
-      <input type="number" id="maxValue_A" placeholder="max" value="200">
-    </label>
-    <button id="applyFilter_A">Filtrer parcelles</button>
-    <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
-    <span class="status" id="status_A" style="margin-left:auto"></span>
-  </div>
-
-  <!-- Bâtiments -->
-  <div class="controls" id="controlsB">
-    <strong>Bâtiments</strong>
-    <label>Champ :
-      <select id="fieldSelect_B"></select>
-    </label>
-    <label>Min :
-      <input type="number" id="minValue_B" placeholder="min" value="75">
-    </label>
-    <label>Max :
-      <input type="number" id="maxValue_B" placeholder="max" value="100">
-    </label>
-    <button id="applyFilter_B">Filtrer bâtiments</button>
-    <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
-    <span class="status" id="status_B" style="margin-left:auto"></span>
-  </div>
-
+  <!-- 🗺️ Carte -->
   <div id="map"></div>
 
   <script type="module">
@@ -100,16 +138,26 @@
     B: { data: null, layer: null, color: "#FF4136" }
   };
 
-  // --- initialisation au chargement DOM
   document.addEventListener("DOMContentLoaded", () => {
     initMap();
     initSearchUI();
-    // lier les boutons Filtrer (plus propre que onclick inline)
+
+    // filtrage
     document.getElementById("applyFilter_A").addEventListener("click", () => renderFiltered("A"));
     document.getElementById("applyFilter_B").addEventListener("click", () => renderFiltered("B"));
+
+    // chargement
     document.getElementById("loadButton").addEventListener("click", () => {
       const code = document.getElementById("codeInsee").value || guessInseeFromInput();
       if (code) loadBothDatasets(code);
+    });
+
+    // bouton de repli
+    const toggleBtn = document.getElementById("toggleButton");
+    const container = document.getElementById("controlContainer");
+    toggleBtn.addEventListener("click", () => {
+      container.classList.toggle("collapsed");
+      toggleBtn.textContent = container.classList.contains("collapsed") ? "▶️" : "▼";
     });
   });
 
@@ -120,7 +168,6 @@
     }).addTo(map);
   }
 
-  // Récupérer code INSEE si l'utilisateur a collé un code directement
   function guessInseeFromInput() {
     const q = document.getElementById("communeInput").value.trim();
     if (/^\d{5}$/.test(q)) {
@@ -130,7 +177,6 @@
     return "";
   }
 
-  // --- Search/autocomplete UI
   function initSearchUI() {
     const searchInput = document.getElementById("communeInput");
     const resultsDiv = document.getElementById("results");
@@ -141,13 +187,12 @@
       const q = searchInput.value.trim();
       resultsDiv.innerHTML = "";
       document.getElementById("status_global").textContent = "";
-
       if (q.length < 3) return;
 
       if (controller) controller.abort();
       controller = new AbortController();
-
       clearTimeout(timeout);
+
       timeout = setTimeout(async () => {
         try {
           const apiUrl = `https://tabular-api.data.gouv.fr/api/resources/dbe8a621-a9c4-4bc3-9cae-be1699c5ff25/data/json/?page=1&page_size=20&nom_commune__contains=${encodeURIComponent(q)}`;
@@ -162,12 +207,10 @@
           }
 
           if (communes.length === 1) {
-            // sélectionner automatiquement
             selectCommune(communes[0]);
             return;
           }
 
-          // afficher liste
           communes.forEach(c => {
             const item = document.createElement("div");
             item.className = "result-item";
@@ -175,11 +218,8 @@
             item.addEventListener("click", () => selectCommune(c));
             resultsDiv.appendChild(item);
           });
-
         } catch (err) {
-          if (err.name === 'AbortError') return;
-          console.error("Erreur API commune:", err);
-          document.getElementById("status_global").textContent = "Erreur recherche commune.";
+          if (err.name !== 'AbortError') console.error("Erreur API commune:", err);
         }
       }, 300);
     });
@@ -189,52 +229,38 @@
     document.getElementById("communeInput").value = c.nom_commune_complet || c.nom_commune || "";
     document.getElementById("results").innerHTML = "";
     document.getElementById("codeInsee").value = c.code_commune_INSEE || c.code_insee || "";
-    // lancer chargement auto si code présent
     const code = document.getElementById("codeInsee").value;
     if (code) {
-      document.getElementById("status_global").textContent = `Commune sélectionnée : ${c.nom_commune_complet || c.nom_commune || ""} (${code})`;
+      document.getElementById("status_global").textContent = `Commune : ${c.nom_commune_complet || c.nom_commune} (${code})`;
       loadBothDatasets(code);
     }
   }
 
-  // --- Chargement des deux jeux
   async function loadBothDatasets(code) {
-    // gestion particulière pour départements outre-mer (codes commençant par 97x, 98)
     const dep = code.substring(0, 2);
     const base = `https://cadastre.data.gouv.fr/data/etalab-cadastre/latest/geojson/communes/${dep}/${code}`;
     const urls = {
       A: `${base}/cadastre-${code}-parcelles.json.gz`,
       B: `${base}/cadastre-${code}-batiments.json.gz`
     };
-
     document.getElementById("status_A").textContent = "⏳ Chargement...";
     document.getElementById("status_B").textContent = "⏳ Chargement...";
-
-    // lance les deux chargements (parallèle)
-    await Promise.allSettled([ loadData("A", urls.A), loadData("B", urls.B) ]);
-
-    // ajuster vue si on a une couche
+    await Promise.allSettled([loadData("A", urls.A), loadData("B", urls.B)]);
     if (datasets.A.layer) map.fitBounds(datasets.A.layer.getBounds());
     else if (datasets.B.layer) map.fitBounds(datasets.B.layer.getBounds());
   }
 
-  // --- chargement et calcul area
   async function loadData(id, url) {
     try {
-      document.getElementById(`status_${id}`).textContent = "⏳ Téléchargement...";
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const buf = new Uint8Array(await response.arrayBuffer());
-      let text;
-      if (buf[0] === 0x1f && buf[1] === 0x8b) text = pako.ungzip(buf, { to: "string" });
-      else text = new TextDecoder("utf-8").decode(buf);
+      let text = (buf[0] === 0x1f && buf[1] === 0x8b)
+        ? pako.ungzip(buf, { to: "string" })
+        : new TextDecoder("utf-8").decode(buf);
 
       const geojsonData = JSON.parse(text);
-
-      geojsonData.features.forEach(f => {
-        try { f.properties.area_m2 = turf.area(f); }
-        catch { f.properties.area_m2 = null; }
-      });
+      geojsonData.features.forEach(f => { try { f.properties.area_m2 = turf.area(f); } catch { f.properties.area_m2 = null; } });
 
       datasets[id].data = geojsonData;
       document.getElementById(`status_${id}`).textContent = "✅ Chargé.";
@@ -242,62 +268,45 @@
       renderFiltered(id);
     } catch (err) {
       console.error(err);
-      document.getElementById(`status_${id}`).textContent = "❌ Erreur de chargement.";
-      document.getElementById(`countDisplay_${id}`).textContent = `Nombre : 0`;
+      document.getElementById(`status_${id}`).textContent = "❌ Erreur.";
     }
   }
 
   function populateFieldSelect(id) {
     const ds = datasets[id];
-    if (!ds.data || !ds.data.features || ds.data.features.length === 0) return;
-    const fields = Object.keys(ds.data.features[0].properties).filter(Boolean);
+    if (!ds.data || !ds.data.features?.length) return;
+    const fields = Object.keys(ds.data.features[0].properties);
     if (!fields.includes("area_m2")) fields.push("area_m2");
     const sel = document.getElementById(`fieldSelect_${id}`);
     sel.innerHTML = fields.map(f => `<option value="${f}" ${f === "area_m2" ? "selected" : ""}>${f}</option>`).join("");
   }
 
-  // --- filtrage et rendu
   function renderFiltered(id) {
     const ds = datasets[id];
     if (!ds.data) return;
     const field = document.getElementById(`fieldSelect_${id}`).value;
     const minVal = parseFloat(document.getElementById(`minValue_${id}`).value);
     const maxVal = parseFloat(document.getElementById(`maxValue_${id}`).value);
-
     const filtered = {
       type: "FeatureCollection",
       features: ds.data.features.filter(f => {
-        const raw = f.properties ? f.properties[field] : undefined;
-        const val = parseFloat(raw);
+        const val = parseFloat(f.properties[field]);
         if (isNaN(val)) return false;
         if (!isNaN(minVal) && val < minVal) return false;
         if (!isNaN(maxVal) && val > maxVal) return false;
         return true;
       })
     };
-
     document.getElementById(`countDisplay_${id}`).textContent = `Nombre : ${filtered.features.length}`;
-
     if (ds.layer) map.removeLayer(ds.layer);
-
     ds.layer = L.geoJSON(filtered, {
       style: { color: ds.color, weight: 1, fillOpacity: 0.4 },
       onEachFeature: (f, layer) => {
-        const props = f.properties || {};
-        layer.bindPopup(
-          `<b>${field}</b>: ${props[field] ?? "N/A"}<br>` +
-          `<b>area_m2</b>: ${props.area_m2 ? Number(props.area_m2).toFixed(2) : "N/A"}<br>` +
-          Object.entries(props).map(([k, v]) => `<b>${k}</b>: ${v}`).join("<br>")
-        );
+        const p = f.properties;
+        layer.bindPopup(`<b>${field}</b>: ${p[field]}<br><b>area_m2</b>: ${p.area_m2 ? p.area_m2.toFixed(2) : "N/A"}`);
       }
     }).addTo(map);
-
-    if (filtered.features.length > 0) map.fitBounds(ds.layer.getBounds());
   }
-
-  // si tu veux exposer la fonction globalement (option B), décommenter :
-  // window.renderFiltered = renderFiltered;
-
   </script>
 </body>
 </html>
