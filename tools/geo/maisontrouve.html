@@ -32,7 +32,7 @@
     document.getElementById(`loadButton_${id}`).addEventListener("click", () => {
       const url = document.getElementById(`geojsonUrl_${id}`).value.trim();
       if (url) {
-        document.getElementById(`status_${id}`).textContent = "⏳ Loading...";
+        document.getElementById(`status_${id}`).textContent = "⏳ Chargement...";
         loadData(id, url);
       }
     });
@@ -62,12 +62,12 @@
       });
 
       datasets[id].data = geojsonData;
-      document.getElementById(`status_${id}`).textContent = "✅ Data loaded.";
+      document.getElementById(`status_${id}`).textContent = "✅ Chargé.";
       populateFieldSelect(id);
       renderFiltered(id);
     } catch (err) {
       console.error(err);
-      document.getElementById(`status_${id}`).textContent = "❌ Failed to load data (CORS?).";
+      document.getElementById(`status_${id}`).textContent = "❌ Erreur de chargement.";
     }
   }
 
@@ -99,7 +99,7 @@
       })
     };
 
-    document.getElementById(`countDisplay_${id}`).textContent = `Count: ${filtered.features.length}`;
+    document.getElementById(`countDisplay_${id}`).textContent = `Nombre : ${filtered.features.length}`;
 
     if (ds.layer) map.removeLayer(ds.layer);
 
@@ -159,7 +159,7 @@
       <label>URL:
         <input type="text" id="geojsonUrl_A" size="80" value="https://cadastre.data.gouv.fr/data/etalab-cadastre/2025-09-01/geojson/communes/66/66227/cadastre-66227-parcelles.json.gz">
       </label>
-      <button id="loadButton_A">Load</button>
+      <button id="loadButton_A">Charger les données</button>
       <span class="status" id="status_A"></span>
     </div>
     <div class="controls">
@@ -172,8 +172,8 @@
       <label>Max:
         <input type="number" id="maxValue_A" placeholder="max">
       </label>
-      <button id="applyFilter_A">Apply filter</button>
-      <span class="countDisplay" id="countDisplay_A">Count: 0</span>
+      <button id="applyFilter_A">Filtrer</button>
+      <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
     </div>
   </div>
 
@@ -184,7 +184,7 @@
       <label>URL:
         <input type="text" id="geojsonUrl_B" size="80" value="https://cadastre.data.gouv.fr/data/etalab-cadastre/2025-09-01/geojson/communes/66/66227/cadastre-66227-batiments.json.gz">
       </label>
-      <button id="loadButton_B">Load</button>
+      <button id="loadButton_B">Charger les données</button>
       <span class="status" id="status_B"></span>
     </div>
     <div class="controls">
@@ -197,8 +197,8 @@
       <label>Max:
         <input type="number" id="maxValue_B" placeholder="max">
       </label>
-      <button id="applyFilter_B">Apply filter</button>
-      <span class="countDisplay" id="countDisplay_B">Count: 0</span>
+      <button id="applyFilter_B">Filtrer</button>
+      <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
     </div>
   </div>
 
