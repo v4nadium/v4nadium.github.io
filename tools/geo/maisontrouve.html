@@ -11,6 +11,7 @@
     body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
     #map { flex: 1; min-height: 200px; }
 
+    /* header au-dessus de la carte */
     #header {
       background: #ddd;
       display: flex;
@@ -18,6 +19,8 @@
       justify-content: space-between;
       padding: 0.4em 0.6em;
       border-bottom: 2px solid #999;
+      position: relative;
+      z-index: 1200; /* au-dessus de la carte */
     }
     #toggleButton {
       background: none;
@@ -25,13 +28,16 @@
       font-size: 1.2em;
       cursor: pointer;
       transition: transform 0.2s ease;
+      padding: 0.2em 0.5em;
     }
+    #toggleButton:active { transform: scale(0.98); }
 
     #controlContainer {
-      transition: max-height 0.3s ease, opacity 0.25s ease;
+      transition: max-height 0.28s ease, opacity 0.25s ease;
       overflow: hidden;
       max-height: 1000px;
       opacity: 1;
+      z-index: 1100;
     }
     #controlContainer.collapsed {
       max-height: 0;
@@ -43,7 +49,7 @@
     #communeInput { flex: 1 1; min-width: 120px; padding:0.5em; font-size:1rem; }
     #loadButton { padding:0.5em 0.75em; font-size:1rem; }
 
-    #results { position: absolute; left: 0.5em; top: calc(100% + 4px); background: white; border: 1px solid #ccc; max-height: 220px; overflow-y: auto; width: calc(100% - 1em); z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    #results { position: absolute; left: 0.5em; top: calc(100% + 4px); background: white; border: 1px solid #ccc; max-height: 220px; overflow-y: auto; width: calc(100% - 1em); z-index: 2000; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     .result-item { padding: 0.5em; cursor: pointer; }
     .result-item:hover { background: #def; }
 
@@ -71,9 +77,11 @@
     }
 
     @media (max-width:640px) {
-      #search-row { flex-direction: row; align-items: flex-start; }
-      .controls { flex-direction: row; align-items: flex-start; }
+      #search-row { flex-direction: column; align-items: stretch; }
+      .controls { flex-direction: column; align-items: stretch; }
       #results { width: calc(100% - 1em); left:0.5em; right:0.5em; }
+      .controls > * { width: 100%; }
+      button { width: 100%; }
     }
   </style>
 </head>
@@ -81,32 +89,26 @@
 
   <div id="header">
     <strong>Trouver une maison</strong>
-    <button id="toggleButton" title="Replier les contrôles">▼</button>
+    <button id="toggleButton" title="Replier les contrôles">▾</button>
   </div>
 
   <div id="controlContainer">
     <div id="search">
       <div id="search-row">
         <label style="font-weight:600;">Commune :</label>
-        <input type="text" id="communeInput" placeholder="Saisir le nom de la commune...">
-        <button id="loadButton">Charger les données</button>
+        <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." aria-label="Commune">
+        <button id="loadButton" aria-label="Charger les données">Charger les données</button>
         <input type="hidden" id="codeInsee" />
         <span id="status_global" style="margin-left:0.5em;"></span>
       </div>
-      <div id="results"></div>
+      <div id="results" aria-live="polite"></div>
     </div>
 
     <div class="controls" id="controlsA">
       <strong>Parcelles</strong>
-      <label>Champ :
-        <select id="fieldSelect_A"></select>
-      </label>
-      <label>Min :
-        <input type="number" id="minValue_A" value="150">
-      </label>
-      <label>Max :
-        <input type="number" id="maxValue_A" value="200">
-      </label>
+      <label>Champ : <select id="fieldSelect_A"></select></label>
+      <label>Min : <input type="number" id="minValue_A" value="150"></label>
+      <label>Max : <input type="number" id="maxValue_A" value="200"></label>
       <button id="applyFilter_A">Filtrer</button>
       <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
       <span class="status" id="status_A" style="margin-left:auto"></span>
@@ -114,15 +116,9 @@
 
     <div class="controls" id="controlsB">
       <strong>Bâtiments</strong>
-      <label>Champ :
-        <select id="fieldSelect_B"></select>
-      </label>
-      <label>Min :
-        <input type="number" id="minValue_B" value="75">
-      </label>
-      <label>Max :
-        <input type="number" id="maxValue_B" value="100">
-      </label>
+      <label>Champ : <select id="fieldSelect_B"></select></label>
+      <label>Min : <input type="number" id="minValue_B" value="75"></label>
+      <label>Max : <input type="number" id="maxValue_B" value="100"></label>
       <button id="applyFilter_B">Filtrer</button>
       <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
       <span class="status" id="status_B" style="margin-left:auto"></span>
@@ -144,6 +140,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     initMap();
     initSearchUI();
+
     document.getElementById("applyFilter_A").addEventListener("click", () => renderFiltered("A"));
     document.getElementById("applyFilter_B").addEventListener("click", () => renderFiltered("B"));
     document.getElementById("loadButton").addEventListener("click", () => {
@@ -151,73 +148,86 @@
       if (code) loadBothDatasets(code);
     });
 
+    // toggle : stopPropagation + preventDefault to avoid map click capturing
     const toggleBtn = document.getElementById("toggleButton");
     const container = document.getElementById("controlContainer");
-    toggleBtn.addEventListener("click", () => {
+    toggleBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
       const nowCollapsed = container.classList.toggle("collapsed");
-      toggleBtn.textContent = nowCollapsed ? "▶️" : "▼";
+      toggleBtn.textContent = nowCollapsed ? "▶" : "▾";
+
+      // attendre la transition puis invalider la taille de la carte et recadrer si besoin
       setTimeout(() => {
-        map.invalidateSize();
+        try { map.invalidateSize({ pan: false }); } catch (err) {}
         const bounds =
           (datasets.A.layer && datasets.A.layer.getBounds && datasets.A.layer.getBounds()) ||
           (datasets.B.layer && datasets.B.layer.getBounds && datasets.B.layer.getBounds());
-        if (bounds && bounds.isValid && bounds.isValid()) map.fitBounds(bounds);
-      }, 350);
+        if (bounds && bounds.isValid && bounds.isValid()) {
+          try { map.fitBounds(bounds); } catch (err) {}
+        }
+      }, 320);
     });
 
+    // aussi sur resize
     window.addEventListener("resize", () => {
-      setTimeout(() => { map.invalidateSize(); }, 200);
+      setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 200);
     });
   });
 
   function initMap() {
     map = L.map("map").setView([46.6, 2.5], 6);
 
+    // WMTS : crossOrigin pour éviter avertissement cookie en console
     const ignOrtho = L.tileLayer(
       "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=HR.ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg",
-      { maxZoom: 19, attribution: "© IGN - Géoportail" }
+      { maxZoom: 19, attribution: "© IGN - Géoportail", crossOrigin: 'anonymous' }
     ).addTo(map);
 
     const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 19, attribution: "© OpenStreetMap" });
+      { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: 'anonymous' });
 
     L.control.layers({ "Orthophotos IGN": ignOrtho, "OpenStreetMap": osm }).addTo(map);
 
-    // 🔹 Ajout du bouton Street View
+    // bouton Street View (topright)
     const streetViewBtn = L.control({ position: "topright" });
     streetViewBtn.onAdd = () => {
       const btn = L.DomUtil.create("button", "streetview-button");
       btn.innerHTML = "🧍";
       btn.title = "Activer le mode Street View";
-      btn.onclick = (e) => {
-        e.preventDefault();
-        toggleStreetViewMode(btn);
-      };
+      // empêcher la propagation du clic vers la carte (évite ouverture involontaire)
+      btn.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); toggleStreetViewMode(btn); });
       return btn;
     };
     streetViewBtn.addTo(map);
+
+    // gestion du clic carte pour street view (on utilisera map.once à l'activation)
+    map.on("click", (e) => {
+      // rien ici : on gère via map.once lors de l'activation pour éviter conflits
+    });
   }
 
-  // 🧭 Activation du mode Street View avec un petit délai
+  // activation mode Street View avec délai pour ignorer le clic sur le bouton
   function toggleStreetViewMode(btn) {
     streetViewMode = !streetViewMode;
     btn.classList.toggle("active", streetViewMode);
     if (streetViewMode) {
-      map._container.style.cursor = "crosshair";
-      // ⏳ Délai pour éviter d’ouvrir un onglet sur le clic du bouton
+      map.getContainer().style.cursor = "crosshair";
+      // petit délai pour éviter que le clic sur le bouton soit pris pour le clic carte
       setTimeout(() => {
         map.once("click", (e) => {
           const { lat, lng } = e.latlng;
           const url = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lng}`;
           window.open(url, "_blank");
-          // Désactivation automatique après un clic
+          // désactiver après clic
           streetViewMode = false;
           btn.classList.remove("active");
-          map._container.style.cursor = "";
+          map.getContainer().style.cursor = "";
         });
       }, 300);
     } else {
-      map._container.style.cursor = "";
+      map.getContainer().style.cursor = "";
     }
   }
 
@@ -241,7 +251,10 @@
     document.getElementById("status_B").textContent = "⏳ Chargement...";
     await Promise.allSettled([loadData("A", urls.A), loadData("B", urls.B)]);
     const ds = datasets.A.layer || datasets.B.layer;
-    if (ds) map.fitBounds(ds.getBounds());
+    if (ds) {
+      try { map.fitBounds(ds.getBounds()); } catch(e){}
+      map.invalidateSize();
+    }
   }
 
   async function loadData(id, url) {
@@ -303,7 +316,57 @@
         layer.bindPopup(`<b>${field}</b>: ${p[field]}<br><b>area_m2</b>: ${p.area_m2 ? p.area_m2.toFixed(2) : "N/A"}`);
       }
     }).addTo(map);
-    map.invalidateSize();
+    // forcer redraw si nécessaire
+    try { map.invalidateSize({ pan: false }); } catch(e){}
+  }
+
+  function initSearchUI() {
+    const searchInput = document.getElementById("communeInput");
+    const resultsDiv = document.getElementById("results");
+    let controller = null, timeout = null;
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim();
+      resultsDiv.innerHTML = "";
+      document.getElementById("status_global").textContent = "";
+      if (q.length < 3) return;
+      if (controller) controller.abort();
+      controller = new AbortController();
+      clearTimeout(timeout);
+      timeout = setTimeout(async () => {
+        try {
+          const apiUrl = `https://tabular-api.data.gouv.fr/api/resources/dbe8a621-a9c4-4bc3-9cae-be1699c5ff25/data/json/?page=1&page_size=20&nom_commune__contains=${encodeURIComponent(q)}`;
+          const resp = await fetch(apiUrl, { signal: controller.signal });
+          const data = await resp.json();
+          const communes = Array.isArray(data.results) ? data.results : data;
+          resultsDiv.innerHTML = "";
+          if (!communes || communes.length === 0) {
+            resultsDiv.innerHTML = `<div class="result-item">Aucun résultat</div>`;
+            return;
+          }
+          if (communes.length === 1) return selectCommune(communes[0]);
+          communes.forEach(c => {
+            const item = document.createElement("div");
+            item.className = "result-item";
+            item.textContent = c.nom_commune_complet || c.nom_commune || "(nom inconnu)";
+            item.addEventListener("click", () => selectCommune(c));
+            resultsDiv.appendChild(item);
+          });
+        } catch (err) {
+          if (err.name !== 'AbortError') console.error("Erreur API commune:", err);
+        }
+      }, 300);
+    });
+  }
+
+  function selectCommune(c) {
+    document.getElementById("communeInput").value = c.nom_commune_complet || c.nom_commune || "";
+    document.getElementById("results").innerHTML = "";
+    document.getElementById("codeInsee").value = c.code_commune_INSEE || c.code_insee || "";
+    const code = document.getElementById("codeInsee").value;
+    if (code) {
+      document.getElementById("status_global").textContent = `Commune : ${c.nom_commune_complet || c.nom_commune} (${code})`;
+      loadBothDatasets(code);
+    }
   }
   </script>
 </body>
