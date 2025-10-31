@@ -11,7 +11,6 @@
     body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
     #map { flex: 1; min-height: 200px; }
 
-    /* Barre principale et bouton replier */
     #header {
       background: #ddd;
       display: flex;
@@ -28,7 +27,6 @@
       transition: transform 0.2s ease;
     }
 
-    /* Bloc repliable */
     #controlContainer {
       transition: max-height 0.3s ease, opacity 0.25s ease;
       overflow: hidden;
@@ -40,18 +38,15 @@
       opacity: 0;
     }
 
-    /* Recherche */
     #search { background: #f0f0f0; padding: 0.5em; border-bottom: 2px solid #999; position: relative; }
     #search-row { display:flex; gap:0.5em; align-items:center; flex-wrap:wrap; }
     #communeInput { flex: 1 1; min-width: 120px; padding:0.5em; font-size:1rem; }
     #loadButton { padding:0.5em 0.75em; font-size:1rem; }
 
-    /* résultats autocomplete */
     #results { position: absolute; left: 0.5em; top: calc(100% + 4px); background: white; border: 1px solid #ccc; max-height: 220px; overflow-y: auto; width: calc(100% - 1em); z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     .result-item { padding: 0.5em; cursor: pointer; }
     .result-item:hover { background: #def; }
 
-    /* Controls sections */
     .controls { display:flex; gap:0.5em; align-items:center; padding:0.5em; background:#fafafa; border-top:1px solid #ddd; flex-wrap:wrap; }
     .controls label { display:flex; align-items:center; gap:0.4em; }
     select, input[type="number"], button { padding:0.45em 0.5em; font-size:1rem; }
@@ -59,66 +54,74 @@
     .countDisplay { font-weight:bold; color:#333; margin-left:0.5em; }
     .hidden { display: none; }
 
-    /* Mobile */
+    .leaflet-top.leaflet-right { display:flex; flex-direction:column; align-items:flex-end; }
+    .streetview-button {
+      background:#fff;
+      border:2px solid #666;
+      border-radius:4px;
+      padding:4px 8px;
+      margin:4px;
+      cursor:pointer;
+      font-size:14px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.2);
+    }
+    .streetview-button.active {
+      background:#ffc107;
+      border-color:#e0a800;
+    }
+
     @media (max-width:640px) {
       #search-row { flex-direction: row; align-items: flex-start; }
       .controls { flex-direction: row; align-items: flex-start; }
       #results { width: calc(100% - 1em); left:0.5em; right:0.5em; }
-      /*.controls > * { width: 100%; }*/
-      /*button { width: 100%; }*/
     }
   </style>
 </head>
 <body>
 
-  <!-- 🧭 Barre supérieure avec bouton de repli -->
   <div id="header">
     <strong>Trouver une maison</strong>
     <button id="toggleButton" title="Replier les contrôles">▼</button>
   </div>
 
-  <!-- 🧩 Bloc repliable contenant les contrôles -->
   <div id="controlContainer">
-    <!-- Recherche par nom de commune -->
     <div id="search">
       <div id="search-row">
         <label style="font-weight:600;">Commune :</label>
-        <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." aria-label="Commune">
-        <button id="loadButton" aria-label="Charger les données">Charger les données</button>
+        <input type="text" id="communeInput" placeholder="Saisir le nom de la commune...">
+        <button id="loadButton">Charger les données</button>
         <input type="hidden" id="codeInsee" />
         <span id="status_global" style="margin-left:0.5em;"></span>
       </div>
-      <div id="results" aria-live="polite"></div>
+      <div id="results"></div>
     </div>
 
-    <!-- Parcelles -->
     <div class="controls" id="controlsA">
       <strong>Parcelles</strong>
       <label>Champ :
         <select id="fieldSelect_A"></select>
       </label>
       <label>Min :
-        <input type="number" id="minValue_A" placeholder="min" value="150" size="5">
+        <input type="number" id="minValue_A" value="150">
       </label>
       <label>Max :
-        <input type="number" id="maxValue_A" placeholder="max" value="200" size="5">
+        <input type="number" id="maxValue_A" value="200">
       </label>
       <button id="applyFilter_A">Filtrer</button>
       <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
       <span class="status" id="status_A" style="margin-left:auto"></span>
     </div>
 
-    <!-- Bâtiments -->
     <div class="controls" id="controlsB">
       <strong>Bâtiments</strong>
       <label>Champ :
         <select id="fieldSelect_B"></select>
       </label>
       <label>Min :
-        <input type="number" id="minValue_B" placeholder="min" value="75" size="5">
+        <input type="number" id="minValue_B" value="75">
       </label>
       <label>Max :
-        <input type="number" id="maxValue_B" placeholder="max" value="100" size="5">
+        <input type="number" id="maxValue_B" value="100">
       </label>
       <button id="applyFilter_B">Filtrer</button>
       <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
@@ -126,14 +129,13 @@
     </div>
   </div>
 
-  <!-- 🗺️ Carte -->
   <div id="map"></div>
 
   <script type="module">
   import pako from "https://cdn.jsdelivr.net/npm/pako@2.1.0/+esm";
   import * as turf from "https://cdn.jsdelivr.net/npm/@turf/turf@7/+esm";
 
-  let map;
+  let map, streetViewMode = false;
   const datasets = {
     A: { data: null, layer: null, color: "#0074D9" },
     B: { data: null, layer: null, color: "#FF4136" }
@@ -142,71 +144,81 @@
   document.addEventListener("DOMContentLoaded", () => {
     initMap();
     initSearchUI();
-
-    // filtrage
     document.getElementById("applyFilter_A").addEventListener("click", () => renderFiltered("A"));
     document.getElementById("applyFilter_B").addEventListener("click", () => renderFiltered("B"));
-
-    // chargement
     document.getElementById("loadButton").addEventListener("click", () => {
       const code = document.getElementById("codeInsee").value || guessInseeFromInput();
       if (code) loadBothDatasets(code);
     });
 
-    // bouton de repli : UN seul gestionnaire, correct
     const toggleBtn = document.getElementById("toggleButton");
     const container = document.getElementById("controlContainer");
     toggleBtn.addEventListener("click", () => {
       const nowCollapsed = container.classList.toggle("collapsed");
       toggleBtn.textContent = nowCollapsed ? "▶️" : "▼";
-
-      // attendre la fin de l'animation puis invalider la taille de la carte
       setTimeout(() => {
-        try { map.invalidateSize({ pan: false }); } catch (e) { /* ignore */ }
-
-        // recentrer sur les données visibles si souhaité
+        map.invalidateSize();
         const bounds =
           (datasets.A.layer && datasets.A.layer.getBounds && datasets.A.layer.getBounds()) ||
           (datasets.B.layer && datasets.B.layer.getBounds && datasets.B.layer.getBounds());
-        if (bounds && bounds.isValid && bounds.isValid()) {
-          try { map.fitBounds(bounds); } catch (e) { /* ignore fit errors */ }
-        }
-      }, 350); // légèrement supérieur à la transition CSS (0.3s)
+        if (bounds && bounds.isValid && bounds.isValid()) map.fitBounds(bounds);
+      }, 350);
     });
 
-    // aussi invalider sur resize (utile pour rotation écran mobile)
     window.addEventListener("resize", () => {
-      setTimeout(() => { try { map.invalidateSize({ pan: false }); } catch(e){} }, 200);
+      setTimeout(() => { map.invalidateSize(); }, 200);
     });
   });
 
   function initMap() {
     map = L.map("map").setView([46.6, 2.5], 6);
 
-    // 🔹 Fond IGN orthophotos (WMTS)
     const ignOrtho = L.tileLayer(
       "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=HR.ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg",
-      {
-        tileSize: 256,
-        maxZoom: 19,
-        attribution: "© IGN - Géoportail",
-      }
-    );
+      { maxZoom: 19, attribution: "© IGN - Géoportail" }
+    ).addTo(map);
 
-    // 🔹 Optionnel : fond OSM pour comparaison
-    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "© OpenStreetMap contributors",
-    });
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 19, attribution: "© OpenStreetMap" });
 
-    // 🔹 Ajout à la carte avec contrôle de couches
-    const baseMaps = {
-      "Orthophotos IGN": ignOrtho,
-      "OpenStreetMap": osm,
+    L.control.layers({ "Orthophotos IGN": ignOrtho, "OpenStreetMap": osm }).addTo(map);
+
+    // 🔹 Ajout du bouton Street View
+    const streetViewBtn = L.control({ position: "topright" });
+    streetViewBtn.onAdd = () => {
+      const btn = L.DomUtil.create("button", "streetview-button");
+      btn.innerHTML = "🧍";
+      btn.title = "Activer le mode Street View";
+      btn.onclick = (e) => {
+        e.preventDefault();
+        toggleStreetViewMode(btn);
+      };
+      return btn;
     };
+    streetViewBtn.addTo(map);
+  }
 
-    ignOrtho.addTo(map); // couche active par défaut
-    L.control.layers(baseMaps).addTo(map);
+  // 🧭 Activation du mode Street View avec un petit délai
+  function toggleStreetViewMode(btn) {
+    streetViewMode = !streetViewMode;
+    btn.classList.toggle("active", streetViewMode);
+    if (streetViewMode) {
+      map._container.style.cursor = "crosshair";
+      // ⏳ Délai pour éviter d’ouvrir un onglet sur le clic du bouton
+      setTimeout(() => {
+        map.once("click", (e) => {
+          const { lat, lng } = e.latlng;
+          const url = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lng}`;
+          window.open(url, "_blank");
+          // Désactivation automatique après un clic
+          streetViewMode = false;
+          btn.classList.remove("active");
+          map._container.style.cursor = "";
+        });
+      }, 300);
+    } else {
+      map._container.style.cursor = "";
+    }
   }
 
   function guessInseeFromInput() {
@@ -216,65 +228,6 @@
       return q;
     }
     return "";
-  }
-
-  function initSearchUI() {
-    const searchInput = document.getElementById("communeInput");
-    const resultsDiv = document.getElementById("results");
-    let controller = null;
-    let timeout = null;
-
-    searchInput.addEventListener("input", () => {
-      const q = searchInput.value.trim();
-      resultsDiv.innerHTML = "";
-      document.getElementById("status_global").textContent = "";
-      if (q.length < 3) return;
-
-      if (controller) controller.abort();
-      controller = new AbortController();
-      clearTimeout(timeout);
-
-      timeout = setTimeout(async () => {
-        try {
-          const apiUrl = `https://tabular-api.data.gouv.fr/api/resources/dbe8a621-a9c4-4bc3-9cae-be1699c5ff25/data/json/?page=1&page_size=20&nom_commune__contains=${encodeURIComponent(q)}`;
-          const resp = await fetch(apiUrl, { signal: controller.signal });
-          const data = await resp.json();
-          const communes = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : (data.results || []));
-          resultsDiv.innerHTML = "";
-
-          if (!communes || communes.length === 0) {
-            resultsDiv.innerHTML = `<div class="result-item">Aucun résultat</div>`;
-            return;
-          }
-
-          if (communes.length === 1) {
-            selectCommune(communes[0]);
-            return;
-          }
-
-          communes.forEach(c => {
-            const item = document.createElement("div");
-            item.className = "result-item";
-            item.textContent = c.nom_commune_complet || c.nom_commune || "(nom inconnu)";
-            item.addEventListener("click", () => selectCommune(c));
-            resultsDiv.appendChild(item);
-          });
-        } catch (err) {
-          if (err.name !== 'AbortError') console.error("Erreur API commune:", err);
-        }
-      }, 300);
-    });
-  }
-
-  function selectCommune(c) {
-    document.getElementById("communeInput").value = c.nom_commune_complet || c.nom_commune || "";
-    document.getElementById("results").innerHTML = "";
-    document.getElementById("codeInsee").value = c.code_commune_INSEE || c.code_insee || "";
-    const code = document.getElementById("codeInsee").value;
-    if (code) {
-      document.getElementById("status_global").textContent = `Commune : ${c.nom_commune_complet || c.nom_commune} (${code})`;
-      loadBothDatasets(code);
-    }
   }
 
   async function loadBothDatasets(code) {
@@ -287,8 +240,8 @@
     document.getElementById("status_A").textContent = "⏳ Chargement...";
     document.getElementById("status_B").textContent = "⏳ Chargement...";
     await Promise.allSettled([loadData("A", urls.A), loadData("B", urls.B)]);
-    if (datasets.A.layer) { map.fitBounds(datasets.A.layer.getBounds()); map.invalidateSize(); }
-    else if (datasets.B.layer) { map.fitBounds(datasets.B.layer.getBounds()); map.invalidateSize(); }
+    const ds = datasets.A.layer || datasets.B.layer;
+    if (ds) map.fitBounds(ds.getBounds());
   }
 
   async function loadData(id, url) {
@@ -296,12 +249,15 @@
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const buf = new Uint8Array(await response.arrayBuffer());
-      let text = (buf[0] === 0x1f && buf[1] === 0x8b)
+      const text = (buf[0] === 0x1f && buf[1] === 0x8b)
         ? pako.ungzip(buf, { to: "string" })
         : new TextDecoder("utf-8").decode(buf);
 
       const geojsonData = JSON.parse(text);
-      geojsonData.features.forEach(f => { try { f.properties.area_m2 = turf.area(f); } catch { f.properties.area_m2 = null; } });
+      geojsonData.features.forEach(f => {
+        try { f.properties.area_m2 = turf.area(f); }
+        catch { f.properties.area_m2 = null; }
+      });
 
       datasets[id].data = geojsonData;
       document.getElementById(`status_${id}`).textContent = "✅ Chargé.";
@@ -347,9 +303,7 @@
         layer.bindPopup(`<b>${field}</b>: ${p[field]}<br><b>area_m2</b>: ${p.area_m2 ? p.area_m2.toFixed(2) : "N/A"}`);
       }
     }).addTo(map);
-
-    // IMPORTANT : forcer Leaflet à recalculer et afficher correctement la couche
-    try { map.invalidateSize({ pan: false }); } catch (e) { /* ignore */ }
+    map.invalidateSize();
   }
   </script>
 </body>
