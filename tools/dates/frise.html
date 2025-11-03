@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>Frise Chronologique</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -36,6 +37,11 @@
       padding: 5px 10px;
       cursor: pointer;
     }
+    #exportButtons {
+      margin-top: 30px;
+      border-top: 1px solid #ccc;
+      padding-top: 15px;
+    }
   </style>
 </head>
 <body>
@@ -43,7 +49,7 @@
 
   <div>
     <h4>Données (séparées par des « ; »)</h4>
-    <p>Format : <code>Étiquette ; début ; fin ; catégorie ; couleur (nom en anglais ou #RRGGBB)</code></p>
+    <p>Format : <code>Étiquette ; début ; fin ; catégorie ; couleur</code></p>
     <textarea id="csvInput">Thalès;-624;-546;Philosophie naturelle;#1f77b4
 Héraclite;-535;-475;Philosophie naturelle;#1f77b4
 Parménide;-515;-450;Ontologie;#2ca02c
@@ -62,18 +68,23 @@ Maïmonide;1138;1204;Philosophie juive;#c49c94
 St Thomas d’Aquin;1225;1274;Théologie chrétienne;#bcbd22</textarea>
   </div>
 
-
   <div class="controls">
     <h3>Paramètres de la frise</h3>
     <label>Début : <input type="number" id="startYear" value="-650"></label>
     <label>Fin : <input type="number" id="endYear" value="1400"></label>
-    <label>Intervalle des graduations : <input type="number" id="tickInterval" value="100"></label>
-    <label>Largeur de la frise : <input type="number" id="timelineWidth" value="1000"></label>
+    <label>Intervalle : <input type="number" id="tickInterval" value="100"></label>
+    <label>Largeur (recherger la page) : <input type="number" id="timelineWidth" value="1000"></label>
   </div>
-
 
   <div class="controls">
     <button id="updateBtn">Mettre à jour la frise</button>
+  </div>
+
+  <div id="exportButtons">
+    <h3>Exporter la frise</h3>
+    <button id="exportSVG">Exporter en SVG</button>
+    <button id="exportPNG">Exporter en PNG</button>
+    <button id="exportPDF">Exporter en PDF ↗</button>
   </div>
 
   <script>
@@ -205,6 +216,134 @@ St Thomas d’Aquin;1225;1274;Théologie chrétienne;#bcbd22</textarea>
 
     // Bouton de mise à jour
     document.getElementById("updateBtn").addEventListener("click", drawTimeline);
+
+    // ==== EXPORTS ====
+
+    function serializeSVGWithFont(svgNode) {
+      const serializer = new XMLSerializer();
+      let svgStr = serializer.serializeToString(svgNode);
+
+      // Injecter un style global
+      const svgStyle = `
+        <style>
+    * {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    .composer-label {
+      font-size: 13px;
+      font-weight: bold;
+      pointer-events: none;
+      user-select: none;
+      paint-order: stroke;
+      stroke-width: 3px;
+      stroke-linejoin: round;
+      fill: white;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      margin-top: 10px;
+      font-family: monospace;
+    }
+    .controls {
+      margin-top: 10px;
+    }
+    .controls input {
+      width: 100px;
+      margin-right: 10px;
+    }
+    button {
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    #exportButtons {
+      margin-top: 30px;
+      border-top: 1px solid #ccc;
+      padding-top: 15px;
+    }
+        </style>
+      `;
+
+      // Insérer le <style> juste après la balise <svg ...>
+      svgStr = svgStr.replace(/<svg([^>]*)>/, `<svg$1>${svgStyle}`);
+
+      return svgStr;
+    }
+
+    // SVG
+    document.getElementById("exportSVG").addEventListener("click", () => {
+      const svgNode = svg.node();
+      let svgStr = serializeSVGWithFont(svgNode);
+      if(!svgStr.match(/^<svg[^>]+xmlns="/)) {
+        svgStr = svgStr.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      const blob = new Blob([svgStr], {type: "image/svg+xml;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "frise.svg";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // PNG
+    document.getElementById("exportPNG").addEventListener("click", async () => {
+      const svgNode = svg.node();
+      const svgStr = serializeSVGWithFont(svgNode);
+      const scale = 5;
+      const canvas = document.createElement("canvas");
+      canvas.width = svgNode.width.baseVal.value * scale;
+      canvas.height = svgNode.height.baseVal.value * scale;
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      const svg64 = btoa(unescape(encodeURIComponent(svgStr)));
+      img.src = 'data:image/svg+xml;base64,' + svg64;
+      img.onload = () => {
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        ctx.drawImage(img, 0, 0);
+        const a = document.createElement("a");
+        a.download = "frise.png";
+        a.href = canvas.toDataURL("image/png");
+        a.click();
+      };
+    });
+
+    // PDF
+    // XXX: renvoie vers un convertisseur SVG to PDF
+    document.getElementById("exportPDF").addEventListener("click", async () => {
+      const url = "https://tools.pdf24.org/fr/svg-en-pdf"; // remplace par l'URL souhaitée
+      window.open(url, "_blank");
+    });
+    // TODO: exporter le SVG dans un PDF
+
+    // ↓ Exporte le PNG dans un PDF (FIXME trop lourd)
+    // document.getElementById("exportPDF").addEventListener("click", async () => {
+    //   const svgNode = svg.node();
+    //   const svgStr = serializeSVGWithFont(svgNode);
+    //   const scale = 5;
+    //   const canvas = document.createElement("canvas");
+    //   canvas.width = svgNode.width.baseVal.value * scale;
+    //   canvas.height = svgNode.height.baseVal.value * scale;
+    //   const ctx = canvas.getContext("2d");
+    //   const img = new Image();
+    //   const svg64 = btoa(unescape(encodeURIComponent(svgStr)));
+    //   img.src = 'data:image/svg+xml;base64,' + svg64;
+    //   img.onload = () => {
+    //     ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    //     ctx.drawImage(img, 0, 0);
+    //     const imgData = canvas.toDataURL("image/png");
+    //     const { jsPDF } = window.jspdf;
+    //     const pdf = new jsPDF({
+    //       orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+    //       unit: "pt",
+    //       format: [canvas.width, canvas.height]
+    //     });
+    //     pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+    //     pdf.save("frise.pdf");
+    //   };
+    // });
+
   </script>
 </body>
 </html>
