@@ -24,13 +24,18 @@
       z-index: 1200; /* au-dessus de la carte */
     }
     #toggleButton {
-      background: none;
-      border: none;
+      /* background: none;
+      border: none; */
       font-size: 1.2em;
       cursor: pointer;
       transition: transform 0.2s ease;
       padding: 0.2em 0.5em;
     }
+
+    .toggle-section {
+      visibility: hidden;
+    }
+
     #toggleButton:active { transform: scale(0.98); }
 
     #controlContainer {
@@ -54,6 +59,13 @@
     .result-item { padding: 0.5em; cursor: pointer; }
     .result-item:hover { background: #def; }
 
+    .controls {
+      display:flex; gap:0.5em; align-items:center;
+      padding:0.5em; background:#fafafa; border-top:1px solid #ddd;
+      flex-wrap:wrap; transition: max-height 0.3s ease, opacity 0.25s ease;
+      overflow:hidden; max-height:1000px; opacity:1;
+    }
+    .controls.collapsed { max-height:2.2em; opacity:0.8; overflow:hidden; }
     .controls { display:flex; gap:0.5em; align-items:center; padding:0.5em; background:#fafafa; border-top:1px solid #ddd; flex-wrap:wrap; }
     .controls label { display:flex; align-items:center; gap:0.4em; }
     select, input[type="number"], button { padding:0.45em 0.5em; font-size:1rem; }
@@ -83,6 +95,15 @@
       #results { width: calc(100% - 1em); left:0.5em; right:0.5em; }
       .controls > * { width: 100%; }
       button { width: 100%; }
+      .toggle-section {
+        /* background: none;
+        border: none; */
+        visibility: visible;
+        font-size: 1.2em;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+        padding: 0.2em 0.5em;
+      }
     }
   </style>
 </head>
@@ -106,6 +127,7 @@
     </div>
 
     <div class="controls" id="controlsA">
+      <button class="toggle-section" data-target="controlsA">▾</button>
       <strong>Parcelles</strong>
       <label>Champ : <select id="fieldSelect_A"></select></label>
       <label>Min : <input type="number" id="minValue_A" value="150"></label>
@@ -116,6 +138,7 @@
     </div>
 
     <div class="controls" id="controlsB">
+      <button class="toggle-section" data-target="controlsB">▾</button>
       <strong>Bâtiments</strong>
       <label>Champ : <select id="fieldSelect_B"></select></label>
       <label>Min : <input type="number" id="minValue_B" value="75"></label>
@@ -169,6 +192,16 @@
           try { map.fitBounds(bounds); } catch (err) {}
         }
       }, 320);
+    });
+
+    document.querySelectorAll(".toggle-section").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const targetId = btn.getAttribute("data-target");
+        const section = document.getElementById(targetId);
+        const collapsed = section.classList.toggle("collapsed");
+        btn.textContent = collapsed ? "▶" : "▼";
+        setTimeout(() => map.invalidateSize(), 300);
+      });
     });
 
     // aussi sur resize
