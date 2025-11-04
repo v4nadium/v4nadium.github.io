@@ -32,16 +32,16 @@
       padding: 0.2em 0.5em;
     }
 
-    .toggle-section {
-      visibility: hidden;
-    }
+    /* .toggle-section { visibility: hidden; } */
 
     #toggleButton:active { transform: scale(0.98); }
 
     #controlContainer {
       transition: max-height 0.28s ease, opacity 0.25s ease;
-      overflow: hidden;
-      max-height: 1000px;
+      overflow-y: auto;
+      max-height: 300px;
+      border: 1px solid #8f8f9d;
+      padding: 8px;
       opacity: 1;
       z-index: 1100;
     }
@@ -90,8 +90,8 @@
     }
 
     @media (max-width:640px) {
-      #search-row { flex-direction: column; align-items: stretch; }
-      .controls { flex-direction: column; align-items: stretch; }
+      #search-row { flex-direction: row; align-items: stretch; }
+      .controls { flex-direction: row; align-items: stretch; }
       #results { width: calc(100% - 1em); left:0.5em; right:0.5em; }
       .controls > * { width: 100%; }
       button { width: 100%; }
@@ -115,7 +115,7 @@
   </div>
 
   <div id="controlContainer">
-    <div id="search">
+    <div class="controls" id="search">
       <div id="search-row">
         <label style="font-weight:600;">Commune :</label>
         <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." aria-label="Commune">
@@ -127,8 +127,7 @@
     </div>
 
     <div class="controls" id="controlsA">
-      <button class="toggle-section" data-target="controlsA">▾</button>
-      <strong>Parcelles</strong>
+      <button class="toggle-section" data-target="controlsA" data-label="Parcelles">▾</button>
       <label>Champ : <select id="fieldSelect_A"></select></label>
       <label>Min : <input type="number" id="minValue_A" value="150"></label>
       <label>Max : <input type="number" id="maxValue_A" value="200"></label>
@@ -138,8 +137,7 @@
     </div>
 
     <div class="controls" id="controlsB">
-      <button class="toggle-section" data-target="controlsB">▾</button>
-      <strong>Bâtiments</strong>
+      <button class="toggle-section" data-target="controlsB" data-label="Bâtiments">▾</button>
       <label>Champ : <select id="fieldSelect_B"></select></label>
       <label>Min : <input type="number" id="minValue_B" value="75"></label>
       <label>Max : <input type="number" id="maxValue_B" value="100"></label>
@@ -197,11 +195,14 @@
     document.querySelectorAll(".toggle-section").forEach(btn => {
       btn.addEventListener("click", e => {
         const targetId = btn.getAttribute("data-target");
+        const label = btn.getAttribute("data-label") || "";
         const section = document.getElementById(targetId);
         const collapsed = section.classList.toggle("collapsed");
-        btn.textContent = collapsed ? "▶" : "▼";
+        btn.textContent = (collapsed ? "▶ " : "▼ ") + label;
         setTimeout(() => map.invalidateSize(), 300);
       });
+    const label = btn.getAttribute("data-label") || "";
+    btn.textContent = "▼ " + label;
     });
 
     // aussi sur resize
