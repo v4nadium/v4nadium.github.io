@@ -145,7 +145,19 @@
       <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
       <span class="status" id="status_B" style="margin-left:auto"></span>
     </div>
+
+    <div class="controls" id="controlsC">
+      <button class="toggle-section" data-target="controlsC" data-label="Piscines">▾</button>
+      <label>Piscine : SYM = 65 <select id="fieldSelect_C"></select></label>
+      <label>Min : <input type="number" id="minValue_C" value="65"></label>
+      <label>Max : <input type="number" id="maxValue_C" value="65"></label>
+      <button id="applyFilter_C">Filtrer</button>
+      <span class="countDisplay" id="countDisplay_C">Nombre : 0</span>
+      <span class="status" id="status_C" style="margin-left:auto"></span>
+    </div>
+
   </div>
+
 
   <div id="map"></div>
 
@@ -155,8 +167,10 @@
 
   let map, streetViewMode = false;
   const datasets = {
-    A: { data: null, layer: null, color: "#0074D9" },
-    B: { data: null, layer: null, color: "#FF4136" }
+    A: { data: null, layer: null, color: "#6b3" },
+    B: { data: null, layer: null, color: "#f53" },
+    C: { data: null, layer: null, color: "#3ad" }
+
   };
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -165,6 +179,7 @@
 
     document.getElementById("applyFilter_A").addEventListener("click", () => renderFiltered("A"));
     document.getElementById("applyFilter_B").addEventListener("click", () => renderFiltered("B"));
+    document.getElementById("applyFilter_C").addEventListener("click", () => renderFiltered("C"));
     document.getElementById("loadButton").addEventListener("click", () => {
       const code = document.getElementById("codeInsee").value || guessInseeFromInput();
       if (code) loadBothDatasets(code);
@@ -185,7 +200,8 @@
         try { map.invalidateSize({ pan: false }); } catch (err) {}
         const bounds =
           (datasets.A.layer && datasets.A.layer.getBounds && datasets.A.layer.getBounds()) ||
-          (datasets.B.layer && datasets.B.layer.getBounds && datasets.B.layer.getBounds());
+          (datasets.B.layer && datasets.B.layer.getBounds && datasets.B.layer.getBounds()) ||
+          (datasets.C.layer && datasets.C.layer.getBounds && datasets.C.layer.getBounds());
         if (bounds && bounds.isValid && bounds.isValid()) {
           try { map.fitBounds(bounds); } catch (err) {}
         }
@@ -280,12 +296,14 @@
     const base = `https://cadastre.data.gouv.fr/data/etalab-cadastre/latest/geojson/communes/${dep}/${code}`;
     const urls = {
       A: `${base}/cadastre-${code}-parcelles.json.gz`,
-      B: `${base}/cadastre-${code}-batiments.json.gz`
+      B: `${base}/cadastre-${code}-batiments.json.gz`,
+      C: `${base}/raw/pci-${code}-tsurf.json.gz`
     };
     document.getElementById("status_A").textContent = "⏳ Chargement...";
     document.getElementById("status_B").textContent = "⏳ Chargement...";
-    await Promise.allSettled([loadData("A", urls.A), loadData("B", urls.B)]);
-    const ds = datasets.A.layer || datasets.B.layer;
+    document.getElementById("status_C").textContent = "⏳ Chargement...";
+    await Promise.allSettled([loadData("A", urls.A), loadData("B", urls.B), loadData("C", urls.C)]);
+    const ds = datasets.A.layer || datasets.B.layer || datasets.C.layer;
     if (ds) {
       try { map.fitBounds(ds.getBounds()); } catch(e){}
       map.invalidateSize();
@@ -339,9 +357,11 @@
         if (isNaN(val)) return false;
         if (!isNaN(minVal) && val < minVal) return false;
         if (!isNaN(maxVal) && val > maxVal) return false;
+        if (id == "C" && Number(f.properties.SYM) !== 65) return false; // SYM = 65 → piscine
         return true;
       })
     };
+
     document.getElementById(`countDisplay_${id}`).textContent = `Nombre : ${filtered.features.length}`;
     if (ds.layer) map.removeLayer(ds.layer);
     ds.layer = L.geoJSON(filtered, {
