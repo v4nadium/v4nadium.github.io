@@ -27,7 +27,7 @@
 
     #controlWrapper {
       position: absolute;
-      top: 32px;
+      top: 66px; /* 34px (site header) + 32px (div id="header") */
       right: 0;
       width: 100%;
       z-index: 1000;
@@ -48,7 +48,7 @@
     #controlContainer {
       transition: max-height 0.28s ease, opacity 0.25s ease;
       overflow-y: auto;
-      max-height: 450px;
+      max-height: 3s;
       border: 1px solid #8f8f9d;
       padding: 0px;
       opacity: 1;
@@ -59,15 +59,15 @@
       opacity: 0;
     }
 
-    .toggle-section {
-/*       border: none; */
-      background: none;
-    }
+    .toggle-section { border-radius: 0.4rem 0 0 0.4rem; }
+    .filterBtn { border-radius: 0 0.4rem 0.4rem 0; }
+
+    .controls.collapsed .toggle-section { border-radius: 0.4rem 0.4rem 0.4rem 0.4rem; }
 
     #search { background: #f0f0f0; padding: 0.5em; border-bottom: 2px solid #999; position: relative; }
-    #search-row { display:flex; gap:0.5em; align-items:center; flex-wrap:wrap; }
-    #communeInput { flex: 1 1; min-width: 120px; padding:0.5em; font-size:1rem; }
-    #loadButton { padding:0.5em 0.75em; font-size:1rem; }
+    #search-row { display:flex; gap:0.5em; align-items:center; }
+    #communeInput { flex: 1 1; min-width: 80px; padding:0.5em; font-size:1rem; }
+    #loadButton { font-size:1rem; max-width: 50px; }
 
     #results { position: absolute; left: 0.5em; top: calc(100% + 4px); background: white; border: 1px solid #ccc; max-height: 220px; overflow-y: auto; width: calc(100% - 1em); z-index: 2000; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
     .result-item { padding: 0.5em; cursor: pointer; }
@@ -124,6 +124,8 @@
         transition: transform 0.2s ease;
         padding: 0.2em 0.5em;
       }
+      .toggle-section { border-radius: 0.4rem 0.4rem 0 0; }
+      .filterBtn { border-radius: 0 0 0.4rem 0.4rem; }
     }
   </style>
 </head>
@@ -140,7 +142,7 @@
         <div id="search-row">
           <label style="font-weight:600;">Commune :</label>
           <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." aria-label="Commune">
-          <button id="loadButton" aria-label="Charger les données">Charger les données</button>
+          <button id="loadButton" aria-label="Charger les données">OK</button>
           <input type="hidden" id="codeInsee" />
           <span id="status_global" style="margin-left:0.5em;"></span>
         </div>
@@ -152,7 +154,7 @@
         <label>Valeur : <select id="fieldSelect_A"></select></label>
         <label>Min : <input type="number" id="minValue_A" value="150"></label>
         <label>Max : <input type="number" id="maxValue_A" value="200"></label>
-        <button id="applyFilter_A">Filtrer</button>
+        <button class="filterBtn" id="applyFilter_A">Filtrer</button>
         <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
         <span class="status" id="status_A" style="margin-left:auto"></span>
       </div>
@@ -162,7 +164,7 @@
         <label>Valeur : <select id="fieldSelect_B"></select></label>
         <label>Min : <input type="number" id="minValue_B" value="75"></label>
         <label>Max : <input type="number" id="maxValue_B" value="100"></label>
-        <button id="applyFilter_B">Filtrer</button>
+        <button class="filterBtn" id="applyFilter_B">Filtrer</button>
         <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
         <span class="status" id="status_B" style="margin-left:auto"></span>
       </div>
@@ -172,7 +174,7 @@
         <label>Valeur : <select id="fieldSelect_C"></select></label>
         <label>Min : <input type="number" id="minValue_C" value="65"></label>
         <label>Max : <input type="number" id="maxValue_C" value="65"></label>
-        <button id="applyFilter_C">Filtrer</button>
+        <button class="filterBtn" id="applyFilter_C">Filtrer</button>
         <span class="countDisplay" id="countDisplay_C">Nombre : 0</span>
         <span class="status" id="status_C" style="margin-left:auto"></span>
       </div>
@@ -253,7 +255,7 @@
   function initMap() {
     map = L.map("map", {zoomControl:false}).setView([46.6, 2.5], 6);
 
-    //zoomControl
+    //zoomControl position
     map.addControl(new L.Control.Zoom({ position: 'bottomleft' }));
 
 
@@ -267,10 +269,10 @@
       { maxZoom: 19, attribution: "© IGN - Géoportail", crossOrigin: 'anonymous' }
     ).addTo(map);
 
-    L.control.layers({ "OpenStreetMap": osm , "Orthophotos IGN": ignOrtho }, null, {position:'bottomright'}).addTo(map);
+    L.control.layers({ "OpenStreetMap": osm , "Orthophotos IGN": ignOrtho }, null, {position:'bottomleft'}).addTo(map);
 
-    // bouton Street View (topright)
-    const streetViewBtn = L.control({ position: "bottomright" });
+    // bouton Street View (bottomleft)
+    const streetViewBtn = L.control({ position: "bottomleft" });
     streetViewBtn.onAdd = () => {
       const btn = L.DomUtil.create("button", "streetview-button");
       btn.innerHTML = "🧍";
