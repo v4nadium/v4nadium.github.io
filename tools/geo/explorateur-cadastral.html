@@ -21,33 +21,47 @@
       padding: 0.4em 0.6em;
       border-bottom: 2px solid #999;
       position: relative;
+      max-height: 32px;
       z-index: 1200; /* au-dessus de la carte */
     }
-    #toggleButton {
-      /* background: none;
-      border: none; */
-      font-size: 1.2em;
-      cursor: pointer;
-      transition: transform 0.2s ease;
-      padding: 0.2em 0.5em;
+
+    #controlWrapper {
+      position: absolute;
+      top: 32px;
+      right: 0;
+      width: 100%;
+      z-index: 1000;
     }
 
-    /* .toggle-section { visibility: hidden; } */
-
-    #toggleButton:active { transform: scale(0.98); }
+    #toggleButton {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      width: 50px;
+      color: #666;
+      border: 1px solid #666; /**/
+      border-radius: 0 0 10px 10px;
+      cursor: pointer;
+      z-index: 1001;
+    }
 
     #controlContainer {
       transition: max-height 0.28s ease, opacity 0.25s ease;
       overflow-y: auto;
-      max-height: 300px;
+      max-height: 450px;
       border: 1px solid #8f8f9d;
-      padding: 8px;
+      padding: 0px;
       opacity: 1;
       z-index: 1100;
     }
     #controlContainer.collapsed {
       max-height: 0;
       opacity: 0;
+    }
+
+    .toggle-section {
+/*       border: none; */
+      background: none;
     }
 
     #search { background: #f0f0f0; padding: 0.5em; border-bottom: 2px solid #999; position: relative; }
@@ -76,10 +90,11 @@
     .leaflet-top.leaflet-right { display:flex; flex-direction:column; align-items:flex-end; }
     .streetview-button {
       background:#fff;
-      border:2px solid #666;
+      border:2px solid #ccc;
       border-radius:4px;
       padding:4px 8px;
       margin:4px;
+      max-width: 48px;
       cursor:pointer;
       font-size:14px;
       box-shadow:0 2px 4px rgba(0,0,0,0.2);
@@ -88,6 +103,11 @@
       background:#ffc107;
       border-color:#e0a800;
     }
+
+/*    .leaflet-control-container {
+      position: absolute;
+      bottom:10%;
+    }*/
 
     @media (max-width:640px) {
       #search-row { flex-direction: row; align-items: stretch; }
@@ -111,53 +131,56 @@
 
   <div id="header">
     <strong>Explorateur cadastral</strong>
-    <button id="toggleButton" title="Replier les contrôles">▾</button>
   </div>
 
-  <div id="controlContainer">
-    <div class="controls" id="search">
-      <div id="search-row">
-        <label style="font-weight:600;">Commune :</label>
-        <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." aria-label="Commune">
-        <button id="loadButton" aria-label="Charger les données">Charger les données</button>
-        <input type="hidden" id="codeInsee" />
-        <span id="status_global" style="margin-left:0.5em;"></span>
+  <div id="controlWrapper">
+
+    <div id="controlContainer">
+      <div class="controls" id="search">
+        <div id="search-row">
+          <label style="font-weight:600;">Commune :</label>
+          <input type="text" id="communeInput" placeholder="Saisir le nom de la commune..." aria-label="Commune">
+          <button id="loadButton" aria-label="Charger les données">Charger les données</button>
+          <input type="hidden" id="codeInsee" />
+          <span id="status_global" style="margin-left:0.5em;"></span>
+        </div>
+        <div id="results" aria-live="polite"></div>
       </div>
-      <div id="results" aria-live="polite"></div>
+
+      <div class="controls" id="controlsA" >
+        <button class="toggle-section" data-target="controlsA" data-label="Parcelles" style="background-color: color-mix(in srgb, #6b3, white 85%);">▾</button>
+        <label>Valeur : <select id="fieldSelect_A"></select></label>
+        <label>Min : <input type="number" id="minValue_A" value="150"></label>
+        <label>Max : <input type="number" id="maxValue_A" value="200"></label>
+        <button id="applyFilter_A">Filtrer</button>
+        <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
+        <span class="status" id="status_A" style="margin-left:auto"></span>
+      </div>
+
+      <div class="controls" id="controlsB">
+        <button class="toggle-section" data-target="controlsB" data-label="Bâtiments" style="background-color: color-mix(in srgb, #f53, white 85%);">▾</button>
+        <label>Valeur : <select id="fieldSelect_B"></select></label>
+        <label>Min : <input type="number" id="minValue_B" value="75"></label>
+        <label>Max : <input type="number" id="maxValue_B" value="100"></label>
+        <button id="applyFilter_B">Filtrer</button>
+        <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
+        <span class="status" id="status_B" style="margin-left:auto"></span>
+      </div>
+
+      <div class="controls" id="controlsC">
+        <button class="toggle-section" data-target="controlsC" data-label="Piscines" style="background-color: color-mix(in srgb, #3ad, white 85%);">▾</button>
+        <label>Valeur : <select id="fieldSelect_C"></select></label>
+        <label>Min : <input type="number" id="minValue_C" value="65"></label>
+        <label>Max : <input type="number" id="maxValue_C" value="65"></label>
+        <button id="applyFilter_C">Filtrer</button>
+        <span class="countDisplay" id="countDisplay_C">Nombre : 0</span>
+        <span class="status" id="status_C" style="margin-left:auto"></span>
+      </div>
+
     </div>
 
-    <div class="controls" id="controlsA">
-      <button class="toggle-section" data-target="controlsA" data-label="Parcelles">▾</button>
-      <label>Champ : <select id="fieldSelect_A"></select></label>
-      <label>Min : <input type="number" id="minValue_A" value="150"></label>
-      <label>Max : <input type="number" id="maxValue_A" value="200"></label>
-      <button id="applyFilter_A">Filtrer</button>
-      <span class="countDisplay" id="countDisplay_A">Nombre : 0</span>
-      <span class="status" id="status_A" style="margin-left:auto"></span>
-    </div>
-
-    <div class="controls" id="controlsB">
-      <button class="toggle-section" data-target="controlsB" data-label="Bâtiments">▾</button>
-      <label>Champ : <select id="fieldSelect_B"></select></label>
-      <label>Min : <input type="number" id="minValue_B" value="75"></label>
-      <label>Max : <input type="number" id="maxValue_B" value="100"></label>
-      <button id="applyFilter_B">Filtrer</button>
-      <span class="countDisplay" id="countDisplay_B">Nombre : 0</span>
-      <span class="status" id="status_B" style="margin-left:auto"></span>
-    </div>
-
-    <div class="controls" id="controlsC">
-      <button class="toggle-section" data-target="controlsC" data-label="Piscines">▾</button>
-      <label>Piscine : <select id="fieldSelect_C"></select></label>
-      <label>Min : <input type="number" id="minValue_C" value="0"></label>
-      <label>Max : <input type="number" id="maxValue_C" value="100"></label>
-      <button id="applyFilter_C">Filtrer</button>
-      <span class="countDisplay" id="countDisplay_C">Nombre : 0</span>
-      <span class="status" id="status_C" style="margin-left:auto"></span>
-    </div>
-
+    <button id="toggleButton" title="Replier les contrôles">▲</button>
   </div>
-
 
   <div id="map"></div>
 
@@ -193,7 +216,7 @@
       e.stopPropagation();
 
       const nowCollapsed = container.classList.toggle("collapsed");
-      toggleBtn.textContent = nowCollapsed ? "▶" : "▼";
+      toggleBtn.textContent = nowCollapsed ? "▼" : "▲";
 
       // attendre la transition puis invalider la taille de la carte et recadrer si besoin
       setTimeout(() => {
@@ -228,7 +251,15 @@
   });
 
   function initMap() {
-    map = L.map("map").setView([46.6, 2.5], 6);
+    map = L.map("map", {zoomControl:false}).setView([46.6, 2.5], 6);
+
+    //zoomControl
+    map.addControl(new L.Control.Zoom({ position: 'bottomleft' }));
+
+
+    // fonds
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: 'anonymous' });
 
     // WMTS : crossOrigin pour éviter avertissement cookie en console
     const ignOrtho = L.tileLayer(
@@ -236,13 +267,10 @@
       { maxZoom: 19, attribution: "© IGN - Géoportail", crossOrigin: 'anonymous' }
     ).addTo(map);
 
-    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 19, attribution: "© OpenStreetMap", crossOrigin: 'anonymous' });
-
-    L.control.layers({ "Orthophotos IGN": ignOrtho, "OpenStreetMap": osm }).addTo(map);
+    L.control.layers({ "OpenStreetMap": osm , "Orthophotos IGN": ignOrtho }, null, {position:'bottomright'}).addTo(map);
 
     // bouton Street View (topright)
-    const streetViewBtn = L.control({ position: "topright" });
+    const streetViewBtn = L.control({ position: "bottomright" });
     streetViewBtn.onAdd = () => {
       const btn = L.DomUtil.create("button", "streetview-button");
       btn.innerHTML = "🧍";
