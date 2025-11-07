@@ -429,7 +429,7 @@
 
   async function loadCommunesCSV() {
     try {
-      const resp = await fetch("https://github.com/v4nadium/v4nadium.github.io/raw/refs/heads/main/tools/geo/explorateur-cadastral-files/20230823-communes-departement-region.csv");
+      const resp = await fetch("./explorateur-cadastral-files/20230823-communes-departement-region.csv");
       const text = await resp.text();
 
       const lines = text.trim().split(/\r?\n/);
