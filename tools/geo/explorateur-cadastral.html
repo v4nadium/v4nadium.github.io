@@ -499,7 +499,7 @@
   document.addEventListener("DOMContentLoaded", loadCommunesCSV);
 
   function selectCommune(c) {
-    document.getElementById("communeInput").value = c.nom_commune_complet || c.nom_commune || "";
+    document.getElementById("communeInput").value = `${c.code_departement} ${c.nom_commune_complet}` || c.nom_commune_complet || c.nom_commune || "";
     document.getElementById("results").innerHTML = "";
     document.getElementById("codeInsee").value = c.code_commune_INSEE || c.code_insee || "";
     const code = document.getElementById("codeInsee").value;
