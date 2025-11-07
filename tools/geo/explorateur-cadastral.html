@@ -138,9 +138,8 @@
         <div id="search-row">
           <label style="font-weight:600; min-width: 6em">Commune :</label>
           <input type="text" id="communeInput" placeholder="64 Espelette" aria-label="Commune">
-          <label style="">N° département + nom commune</label>
           <input type="hidden" id="codeInsee" />
-          <span id="status_global" style="margin-left:0.5em;"></span>
+          <span id="status_global" style="margin-left:0.5em;">N° département + nom commune</span>
         </div>
         <div id="results" aria-live="polite"></div>
       </div>
@@ -216,10 +215,10 @@
     document.getElementById("applyFilter_A").addEventListener("click", () => renderFiltered("A"));
     document.getElementById("applyFilter_B").addEventListener("click", () => renderFiltered("B"));
     document.getElementById("applyFilter_C").addEventListener("click", () => renderFiltered("C"));
-    document.getElementById("loadButton").addEventListener("click", () => {
-      const code = document.getElementById("codeInsee").value || guessInseeFromInput();
-      if (code) loadBothDatasets(code);
-    });
+    // document.getElementById("loadButton").addEventListener("click", () => {
+    //   const code = document.getElementById("codeInsee").value || guessInseeFromInput();
+    //   if (code) loadBothDatasets(code);
+    // });
 
     // toggle : stopPropagation + preventDefault to avoid map click capturing
     const toggleBtn = document.getElementById("toggleButton");
@@ -458,13 +457,13 @@
     searchInput.addEventListener("input", () => {
       const q = searchInput.value.trim();
       resultsDiv.innerHTML = "";
-      document.getElementById("status_global").textContent = "";
+      // document.getElementById("status_global").textContent = "";
       if (q.length < 3) return;
 
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         const query = normalizeString(q);
-        const parts = query.split(" "); // ex : ["66","villefranche"]
+        const parts = query.split(" ");
 
         const filtered = communesCache.filter(c => {
           const name = normalizeString(c.nom_commune_complet || "");
@@ -505,7 +504,7 @@
     document.getElementById("codeInsee").value = c.code_commune_INSEE || c.code_insee || "";
     const code = document.getElementById("codeInsee").value;
     if (code) {
-      document.getElementById("status_global").textContent = `Commune : ${c.nom_commune_complet || c.nom_commune} (${code})`;
+      document.getElementById("status_global").textContent = `${c.nom_commune_complet || c.nom_commune} (${code})`;
       loadBothDatasets(code);
     }
   }
