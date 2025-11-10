@@ -552,7 +552,7 @@
     document.getElementById("codeInsee").value = c.code_commune_INSEE || c.code_insee || "";
     const code = document.getElementById("codeInsee").value;
     if (code) {
-      document.getElementById("status_global").textContent = `${c.nom_commune_complet || c.nom_commune} (${code})`;
+      //document.getElementById("status_global").textContent = `${c.nom_commune_complet || c.nom_commune} (${code})`;
       loadDatasets(code);
     }
   }
