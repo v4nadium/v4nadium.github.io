@@ -384,32 +384,33 @@
         return;
       }
       // Sinon télécharge
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const buf = new Uint8Array(await response.arrayBuffer());
-        const text = (buf[0] === 0x1f && buf[1] === 0x8b)
-          ? pako.ungzip(buf, { to: "string" })
-          : new TextDecoder("utf-8").decode(buf);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const buf = new Uint8Array(await response.arrayBuffer());
+      const text = (buf[0] === 0x1f && buf[1] === 0x8b)
+        ? pako.ungzip(buf, { to: "string" })
+        : new TextDecoder("utf-8").decode(buf);
 
-        const geojsonData = JSON.parse(text);
-        geojsonData.features.forEach(f => {
-          try { f.properties.surface_m2 = turf.area(f); }
-          catch { f.properties.surface_m2 = null; }
-        });
+      const geojsonData = JSON.parse(text);
+      geojsonData.features.forEach(f => {
+        try { f.properties.surface_m2 = turf.area(f); }
+        catch { f.properties.surface_m2 = null; }
+      });
 
-        datasets[id].data = geojsonData;
-        document.getElementById(`status_${id}`).textContent = "✅ Chargé.";
-        populateFieldSelect(id);
-        renderFiltered(id);
-      } catch (err) {
-        console.error(err);
-        document.getElementById(`status_${id}`).textContent = "❌ Erreur.";
-      }
+      // 3️⃣ Mise en cache
+      await cacheSet(key, geojsonData);
 
+      datasets[id].data = geojsonData;
+      document.getElementById(`status_${id}`).textContent = "✅ Chargé.";
+      populateFieldSelect(id);
+      renderFiltered(id);
     }
-    catch (err) { document.getElementById(`status_${id}`).textContent = `❌ Erreur. ${err}`; } //
+    catch (err) {
+      console.error(err);
+      document.getElementById(`status_${id}`).textContent = "❌ Erreur.";
+    }
   }
+
 
   function populateFieldSelect(id) {
     const ds = datasets[id];
