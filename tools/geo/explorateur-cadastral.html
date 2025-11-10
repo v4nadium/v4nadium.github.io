@@ -128,7 +128,7 @@
 <body>
 
   <div id="header">
-    <strong>Explorateur cadastral (<a href="./maisontrouve.html">version stable</a>)</strong>
+    <strong>Explorateur cadastral (<a href="./maisontrouve.html">version stable ici</a> si celle-ci ne fonctionne pas)</strong>
   </div>
 
   <div id="controlWrapper">
@@ -139,7 +139,8 @@
           <label style="font-weight:600; min-width: 6em">Commune :</label>
           <input type="text" id="communeInput" placeholder="64 Espelette" aria-label="Commune">
           <input type="hidden" id="codeInsee" />
-          <span id="status_global" style="margin-left:0.5em;">N° département + nom commune</span>
+<!--           <span id="status_global" style="margin-left:0.5em;">N° département + nom commune</span> -->
+          <button onclick="clearCache()">🗑️ Vider le cache</button>
         </div>
         <div id="results" aria-live="polite"></div>
       </div>
@@ -380,6 +381,7 @@
       if (cached && Date.now() - cached.timestamp < 30 * 24 * 60 * 60 * 1000) { // 30 jours
         console.log("✅ Chargé depuis le cache :", key);
         datasets[id].data = cached.data;
+        populateFieldSelect(id);
         renderFiltered(id);
         return;
       }
@@ -392,6 +394,8 @@
         : new TextDecoder("utf-8").decode(buf);
 
       const geojsonData = JSON.parse(text);
+
+      // propriété surface polygone
       geojsonData.features.forEach(f => {
         try { f.properties.surface_m2 = turf.area(f); }
         catch { f.properties.surface_m2 = null; }
@@ -410,6 +414,13 @@
       document.getElementById(`status_${id}`).textContent = "❌ Erreur.";
     }
   }
+
+  // fonction vider la cache (pour bouton)
+    function clearCache() {
+    const req = dbPromise.result.transaction("datasets", "readwrite").objectStore("datasets").clear();
+    req.onsuccess = () => alert("Cache vidé !");
+  }
+
 
 
   function populateFieldSelect(id) {
