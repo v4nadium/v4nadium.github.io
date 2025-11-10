@@ -215,10 +215,6 @@
     document.getElementById("applyFilter_A").addEventListener("click", () => renderFiltered("A"));
     document.getElementById("applyFilter_B").addEventListener("click", () => renderFiltered("B"));
     document.getElementById("applyFilter_C").addEventListener("click", () => renderFiltered("C"));
-    // document.getElementById("loadButton").addEventListener("click", () => {
-    //   const code = document.getElementById("codeInsee").value || guessInseeFromInput();
-    //   if (code) loadBothDatasets(code);
-    // });
 
     // toggle : stopPropagation + preventDefault to avoid map click capturing
     const toggleBtn = document.getElementById("toggleButton");
@@ -331,7 +327,32 @@
     return "";
   }
 
-  async function loadBothDatasets(code) {
+  // Stockage en local IndexedDB
+  // --- Ouverture/initialisation IndexedDB
+  let dbPromise = indexedDB.open("CadastreCache", 1);
+  dbPromise.onupgradeneeded = e => {
+    const db = e.target.result;
+    db.createObjectStore("datasets", { keyPath: "key" });
+  };
+
+  async function cacheGet(key) {
+    return new Promise((resolve, reject) => {
+      const req = dbPromise.result.transaction("datasets").objectStore("datasets").get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = reject;
+    });
+  }
+
+  async function cacheSet(key, data) {
+    return new Promise((resolve, reject) => {
+      const tx = dbPromise.result.transaction("datasets", "readwrite");
+      tx.objectStore("datasets").put({ key, data, timestamp: Date.now() });
+      tx.oncomplete = resolve;
+      tx.onerror = reject;
+    });
+  }
+
+  async function loadDatasets(code) {
     const dep = code.substring(0, 2);
     const base = `https://cadastre.data.gouv.fr/data/etalab-cadastre/latest/geojson/communes/${dep}/${code}`;
     const urls = {
@@ -351,28 +372,43 @@
   }
 
   async function loadData(id, url) {
+
+    const key = url;
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const buf = new Uint8Array(await response.arrayBuffer());
-      const text = (buf[0] === 0x1f && buf[1] === 0x8b)
-        ? pako.ungzip(buf, { to: "string" })
-        : new TextDecoder("utf-8").decode(buf);
+      // Vérifie dans le cache
+      const cached = await cacheGet(key);
+      if (cached && Date.now() - cached.timestamp < 30 * 24 * 60 * 60 * 1000) { // 30 jours
+        console.log("✅ Chargé depuis le cache :", key);
+        datasets[id].data = cached.data;
+        renderFiltered(id);
+        return;
+      }
+      // Sinon télécharge
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const buf = new Uint8Array(await response.arrayBuffer());
+        const text = (buf[0] === 0x1f && buf[1] === 0x8b)
+          ? pako.ungzip(buf, { to: "string" })
+          : new TextDecoder("utf-8").decode(buf);
 
-      const geojsonData = JSON.parse(text);
-      geojsonData.features.forEach(f => {
-        try { f.properties.surface_m2 = turf.area(f); }
-        catch { f.properties.surface_m2 = null; }
-      });
+        const geojsonData = JSON.parse(text);
+        geojsonData.features.forEach(f => {
+          try { f.properties.surface_m2 = turf.area(f); }
+          catch { f.properties.surface_m2 = null; }
+        });
 
-      datasets[id].data = geojsonData;
-      document.getElementById(`status_${id}`).textContent = "✅ Chargé.";
-      populateFieldSelect(id);
-      renderFiltered(id);
-    } catch (err) {
-      console.error(err);
-      document.getElementById(`status_${id}`).textContent = "❌ Erreur.";
+        datasets[id].data = geojsonData;
+        document.getElementById(`status_${id}`).textContent = "✅ Chargé.";
+        populateFieldSelect(id);
+        renderFiltered(id);
+      } catch (err) {
+        console.error(err);
+        document.getElementById(`status_${id}`).textContent = "❌ Erreur.";
+      }
+
     }
+    catch (err) { document.getElementById(`status_${id}`).textContent = `❌ Erreur. ${err}`; } //
   }
 
   function populateFieldSelect(id) {
@@ -505,7 +541,7 @@
     const code = document.getElementById("codeInsee").value;
     if (code) {
       document.getElementById("status_global").textContent = `${c.nom_commune_complet || c.nom_commune} (${code})`;
-      loadBothDatasets(code);
+      loadDatasets(code);
     }
   }
   </script>
