@@ -60,18 +60,29 @@
     #controlContainer.collapsed {
       max-height: 0;
       opacity: 0;
+      border: 0;
     }
 
      .toggle-section  { border: solid 1px #8f8f9d; border-radius: 0.2rem 0.2rem 0.2rem 0.2rem ; background: rgba(240, 240, 240, 0.3); }
      .filterBtn       { border: solid 1px #8f8f9d; border-radius: 0.2rem 0.2rem 0.2rem 0.2rem ; background: #f0f0f0; }
 
 
-    #search { background: #f0f0f0; padding: 0.5em; border: 1px solid #8f8f9d; position: relative; }
+    #search { background: #f0f0f0; padding: 0.5em; border: 1px solid #8f8f9d; position: relative; z-index: 1050; overflow:visible; justify-content: space-between; }
     #search-row { display:flex; gap:0.5em; align-items:center; }
     #communeInput { flex: 1 1; min-width: 80px; padding:0.5em; font-size:1rem; }
-    #loadButton { font-size:1rem; max-width: 50px; }
+    #clearCacheBtn { max-width: 42px; }
 
-    #results { position: relative; left: 0.5em; top: auto; background: white; border: 1px solid #ccc; height: 150px; overflow-y: auto; width: auto; z-index: 2000; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    #results {
+      position: absolute;
+      left: 7rem;
+      top: calc(100% + 4px); /* juste sous la ligne de saisie */
+      background: white;
+      border: 1px solid #ccc;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 4000;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
     .result-item { padding: 0.5em; cursor: pointer; }
     .result-item:hover { background: #def; }
 
@@ -112,8 +123,8 @@
       #search-row { flex-direction: row; align-items: stretch; }
       .controls { flex-direction: row; align-items: stretch; }
       .controls.collapsed { max-height:1.7rem; }
-      #results { width: calc(100% - 1em); left:0.5em; right:0.5em; }
-      .controls > * { width: 100%; }
+/*       #results { width: calc(100% - 1em); left:0.5em; right:0.5em; } */
+/*       .controls > * { width: 100%; } */
       button { width: 100%; }
       .toggle-section {
         visibility: visible;
@@ -136,11 +147,10 @@
     <div id="controlContainer">
       <div class="controls" id="search">
         <div id="search-row">
-          <label style="font-weight:600; min-width: 6em">Commune :</label>
+          <label style="font-weight:600; min-width: 6rem">Commune :</label>
           <input type="text" id="communeInput" placeholder="64 Espelette" aria-label="Commune">
           <input type="hidden" id="codeInsee" />
-<!--           <span id="status_global" style="margin-left:0.5em;">N° département + nom commune</span> -->
-          <button onclick="clearCache()">🗑️ Vider le cache</button>
+          <button id="clearCacheBtn">🗑️</button>
         </div>
         <div id="results" aria-live="polite"></div>
       </div>
@@ -416,9 +426,14 @@
   }
 
   // fonction vider la cache (pour bouton)
-    function clearCache() {
+  function clearCache() {
     const req = dbPromise.result.transaction("datasets", "readwrite").objectStore("datasets").clear();
     req.onsuccess = () => alert("Cache vidé !");
+
+    // bouton
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("clearCacheBtn").addEventListener("click", clearCache);
+    });
   }
 
 
@@ -486,7 +501,7 @@
         const cols = line.split(",");
         const obj = {};
         headers.forEach((h, i) => obj[h.trim()] = cols[i]?.trim());
-        // padding du code INSEE
+        // padding (zfill) du code INSEE
         obj.code_commune_INSEE = obj.code_commune_INSEE?.padStart(5, "0");
         return obj;
       });
@@ -505,7 +520,6 @@
     searchInput.addEventListener("input", () => {
       const q = searchInput.value.trim();
       resultsDiv.innerHTML = "";
-      // document.getElementById("status_global").textContent = "";
       if (q.length < 3) return;
 
       clearTimeout(timeout);
@@ -552,8 +566,7 @@
     document.getElementById("codeInsee").value = c.code_commune_INSEE || c.code_insee || "";
     const code = document.getElementById("codeInsee").value;
     if (code) {
-      //document.getElementById("status_global").textContent = `${c.nom_commune_complet || c.nom_commune} (${code})`;
-      loadDatasets(code);
+       loadDatasets(code);
     }
   }
   </script>
