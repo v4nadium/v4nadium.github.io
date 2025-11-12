@@ -1,13 +1,13 @@
-header {
-  display: flex;
+
+#site-header {
+  display: flex; width: 100%;
   justify-content: space-between; /* Un logo à gauche, un à droite */
   align-items: flex-start;        /* Alignement en haut */
-  padding: 10px;
+  padding: 0px;
   position: relative;             /* Facultatif, utile pour un fond ou positionnement interne */
 }
 
-#site-logo,
-#tipee-logo {
-  height: 50px;  /* ajuste selon la taille souhaitée */
+header img {
+  height: 40px;  /* ajuste selon la taille souhaitée */
   width: auto;
 }
