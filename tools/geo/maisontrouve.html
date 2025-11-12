@@ -6,7 +6,7 @@
   <title>Explorateur cadastral</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="/includes/header-loader.js" defer></script>
+  <script src="/includes/header-loader.js"></script>
 
   <style>
     body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
@@ -60,18 +60,29 @@
     #controlContainer.collapsed {
       max-height: 0;
       opacity: 0;
+      border: 0;
     }
 
      .toggle-section  { border: solid 1px #8f8f9d; border-radius: 0.2rem 0.2rem 0.2rem 0.2rem ; background: rgba(240, 240, 240, 0.3); }
      .filterBtn       { border: solid 1px #8f8f9d; border-radius: 0.2rem 0.2rem 0.2rem 0.2rem ; background: #f0f0f0; }
 
 
-    #search { background: #f0f0f0; padding: 0.5em; border: 1px solid #8f8f9d; position: relative; }
+    #search { background: #f0f0f0; padding: 0.5em; border: 1px solid #8f8f9d; position: relative; z-index: 1050; overflow:visible; justify-content: space-between; }
     #search-row { display:flex; gap:0.5em; align-items:center; }
     #communeInput { flex: 1 1; min-width: 80px; padding:0.5em; font-size:1rem; }
-    #loadButton { font-size:1rem; max-width: 50px; }
+    #clearCacheBtn { max-width: 42px; }
 
-    #results { position: absolute; left: 0.5em; top: calc(100% + 4px); background: white; border: 1px solid #ccc; max-height: 220px; overflow-y: auto; width: calc(100% - 1em); z-index: 2000; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    #results {
+      position: absolute;
+      left: 7rem;
+      top: calc(100% + 4px); /* juste sous la ligne de saisie */
+      background: white;
+      border: 1px solid #ccc;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 4000;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
     .result-item { padding: 0.5em; cursor: pointer; }
     .result-item:hover { background: #def; }
 
@@ -112,8 +123,8 @@
       #search-row { flex-direction: row; align-items: stretch; }
       .controls { flex-direction: row; align-items: stretch; }
       .controls.collapsed { max-height:1.7rem; }
-      #results { width: calc(100% - 1em); left:0.5em; right:0.5em; }
-      .controls > * { width: 100%; }
+/*       #results { width: calc(100% - 1em); left:0.5em; right:0.5em; } */
+/*       .controls > * { width: 100%; } */
       button { width: 100%; }
       .toggle-section {
         visibility: visible;
@@ -136,10 +147,10 @@
     <div id="controlContainer">
       <div class="controls" id="search">
         <div id="search-row">
-          <label style="font-weight:600; min-width: 6em">Commune :</label>
+          <label style="font-weight:600; min-width: 6rem">Commune :</label>
           <input type="text" id="communeInput" placeholder="64 Espelette" aria-label="Commune">
           <input type="hidden" id="codeInsee" />
-          <span id="status_global" style="margin-left:0.5em;">N° département + nom commune</span>
+          <button id="clearCacheBtn">🗑️</button>
         </div>
         <div id="results" aria-live="polite"></div>
       </div>
@@ -215,10 +226,6 @@
     document.getElementById("applyFilter_A").addEventListener("click", () => renderFiltered("A"));
     document.getElementById("applyFilter_B").addEventListener("click", () => renderFiltered("B"));
     document.getElementById("applyFilter_C").addEventListener("click", () => renderFiltered("C"));
-    // document.getElementById("loadButton").addEventListener("click", () => {
-    //   const code = document.getElementById("codeInsee").value || guessInseeFromInput();
-    //   if (code) loadBothDatasets(code);
-    // });
 
     // toggle : stopPropagation + preventDefault to avoid map click capturing
     const toggleBtn = document.getElementById("toggleButton");
@@ -331,7 +338,32 @@
     return "";
   }
 
-  async function loadBothDatasets(code) {
+  // Stockage en local IndexedDB
+  // --- Ouverture/initialisation IndexedDB
+  let dbPromise = indexedDB.open("CadastreCache", 1);
+  dbPromise.onupgradeneeded = e => {
+    const db = e.target.result;
+    db.createObjectStore("datasets", { keyPath: "key" });
+  };
+
+  async function cacheGet(key) {
+    return new Promise((resolve, reject) => {
+      const req = dbPromise.result.transaction("datasets").objectStore("datasets").get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = reject;
+    });
+  }
+
+  async function cacheSet(key, data) {
+    return new Promise((resolve, reject) => {
+      const tx = dbPromise.result.transaction("datasets", "readwrite");
+      tx.objectStore("datasets").put({ key, data, timestamp: Date.now() });
+      tx.oncomplete = resolve;
+      tx.onerror = reject;
+    });
+  }
+
+  async function loadDatasets(code) {
     const dep = code.substring(0, 2);
     const base = `https://cadastre.data.gouv.fr/data/etalab-cadastre/latest/geojson/communes/${dep}/${code}`;
     const urls = {
@@ -351,7 +383,19 @@
   }
 
   async function loadData(id, url) {
+
+    const key = url;
     try {
+      // Vérifie dans le cache
+      const cached = await cacheGet(key);
+      if (cached && Date.now() - cached.timestamp < 30 * 24 * 60 * 60 * 1000) { // 30 jours
+        console.log("✅ Chargé depuis le cache :", key);
+        datasets[id].data = cached.data;
+        populateFieldSelect(id);
+        renderFiltered(id);
+        return;
+      }
+      // Sinon télécharge
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const buf = new Uint8Array(await response.arrayBuffer());
@@ -360,20 +404,39 @@
         : new TextDecoder("utf-8").decode(buf);
 
       const geojsonData = JSON.parse(text);
+
+      // propriété surface polygone
       geojsonData.features.forEach(f => {
         try { f.properties.surface_m2 = turf.area(f); }
         catch { f.properties.surface_m2 = null; }
       });
 
+      // 3️⃣ Mise en cache
+      await cacheSet(key, geojsonData);
+
       datasets[id].data = geojsonData;
       document.getElementById(`status_${id}`).textContent = "✅ Chargé.";
       populateFieldSelect(id);
       renderFiltered(id);
-    } catch (err) {
+    }
+    catch (err) {
       console.error(err);
       document.getElementById(`status_${id}`).textContent = "❌ Erreur.";
     }
   }
+
+  // fonction vider la cache (pour bouton)
+  function clearCache() {
+    const req = dbPromise.result.transaction("datasets", "readwrite").objectStore("datasets").clear();
+    req.onsuccess = () => alert("Cache vidé !");
+
+    // bouton
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("clearCacheBtn").addEventListener("click", clearCache);
+    });
+  }
+
+
 
   function populateFieldSelect(id) {
     const ds = datasets[id];
@@ -438,7 +501,7 @@
         const cols = line.split(",");
         const obj = {};
         headers.forEach((h, i) => obj[h.trim()] = cols[i]?.trim());
-        // padding du code INSEE
+        // padding (zfill) du code INSEE
         obj.code_commune_INSEE = obj.code_commune_INSEE?.padStart(5, "0");
         return obj;
       });
@@ -457,7 +520,6 @@
     searchInput.addEventListener("input", () => {
       const q = searchInput.value.trim();
       resultsDiv.innerHTML = "";
-      // document.getElementById("status_global").textContent = "";
       if (q.length < 3) return;
 
       clearTimeout(timeout);
@@ -504,8 +566,7 @@
     document.getElementById("codeInsee").value = c.code_commune_INSEE || c.code_insee || "";
     const code = document.getElementById("codeInsee").value;
     if (code) {
-      document.getElementById("status_global").textContent = `${c.nom_commune_complet || c.nom_commune} (${code})`;
-      loadBothDatasets(code);
+       loadDatasets(code);
     }
   }
   </script>
