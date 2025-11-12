@@ -7,3 +7,4 @@ Conversion de données géographiques, Géo,                https://gdal3.js.org
 Explorateur cadastral,               Géo,                ./tools/geo/explorateur-cadastral.html
 DVF (Demande de Valeur Foncière),    Géo,                https://app.dvf.etalab.gouv.fr/
 PLU (Géoportail de l'urbanisme),     Géo,                https://www.geoportail-urbanisme.gouv.fr/map/#tile=1&lon=2&lat=46&zoom=6
+[QGIS] Extension Layouts Extents,    Géo,                https://plugins.qgis.org/plugins/layouts_extents/
