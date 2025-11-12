@@ -1,9 +1,25 @@
 <!-- header.html -->
 
+<style>
+#site-header {
+  display: flex;
+  justify-content: space-between; /* Un logo à gauche, un à droite */
+  align-items: flex-start;        /* Alignement en haut */
+  padding: 10px;
+  position: relative;             /* Facultatif, utile pour un fond ou positionnement interne */
+}
+
+#site-logo,
+#tipee-logo {
+  height: 50px;  /* ajuste selon la taille souhaitée */
+  width: auto;
+}
+</style>
+
 <header>
   <div id="site-header">
     <a href="/index.html" id="logo-link">ok
-      <img src="/includes/tipeee-logo.svg" alt="Mes outils" id="site-logo">
+      <img src="/includes/logo.png" alt="Accueil" id="site-logo">
     </a>
     <a href="https://fr.tipeee.com/v4nadium/" id="tipee-link">
       <img src="/includes/tipeee-logo.svg" alt="Dons" id="tipee-logo">
