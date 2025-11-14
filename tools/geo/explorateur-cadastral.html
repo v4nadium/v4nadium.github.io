@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Explorateur cadastral</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script type="module" src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
   <script src="/includes/header-loader.js"></script>
 
   <style>
@@ -27,7 +28,7 @@
 
     #controlWrapper {
       position: absolute;
-      top: 66px; /* 34px (site header) + 32px (div id="header") */
+      top: 80px; /* 34px (site header) + 46px (div id="header") */
       right: 0;
       width: 100%;
       z-index: 1000;
@@ -70,7 +71,7 @@
     #search { background: #f0f0f0; padding: 0.5em; border: 1px solid #8f8f9d; position: relative; z-index: 1050; overflow:visible; justify-content: space-between; }
     #search-row { display:flex; gap:0.5em; align-items:center; }
     #communeInput { flex: 1 1; min-width: 80px; padding:0.5em; font-size:1rem; }
-    #clearCacheBtn { max-width: 42px; }
+    #communeInput[readonly] { color: #8f8f9d; background: #f0f0f0; }
 
     #results {
       position: absolute;
@@ -125,8 +126,9 @@
       .controls.collapsed { max-height:1.7rem; }
 /*       #results { width: calc(100% - 1em); left:0.5em; right:0.5em; } */
 /*       .controls > * { width: 100%; } */
-      button { width: 100%; }
+      .filterBtn { width: 100%; }
       .toggle-section {
+        width: 100%;
         visibility: visible;
         font-size: 1em;
         cursor: pointer;
@@ -140,6 +142,9 @@
 
   <div id="header">
     <strong>Explorateur cadastral (<a href="./maisontrouve.html">version stable ici</a>)</strong>
+    <p style="height: 100%; color: #676774">|</p>
+    <button id="tokenBtn">🪙 Jeton</button>
+    <button id="clearCacheBtn">🗑️ Cache</button>
   </div>
 
   <div id="controlWrapper">
@@ -148,9 +153,9 @@
       <div class="controls" id="search">
         <div id="search-row">
           <label style="font-weight:600; min-width: 6rem">Commune :</label>
-          <input type="text" id="communeInput" placeholder="64 Espelette" aria-label="Commune">
+          <input type="text" id="communeInput" value="64 Espelette" aria-label="Commune" readonly>
           <input type="hidden" id="codeInsee" />
-          <button id="clearCacheBtn">🗑️</button>
+          <button id="searchBtn">🔍 Recherche</button>
         </div>
         <div id="results" aria-live="polite"></div>
       </div>
@@ -195,6 +200,65 @@
   <script type="module">
   import pako from "https://cdn.jsdelivr.net/npm/pako@2.1.0/+esm";
   import * as turf from "https://cdn.jsdelivr.net/npm/@turf/turf@7/+esm";
+
+  // TOKEN ACCESS
+  const TOKEN_KEY = "access_token";
+
+  // --- Fonctions utilitaires ---
+  function isValidToken(token) {
+    const decoded = LZString.decompressFromBase64(token);
+    const timestamp = parseInt(decoded)*1000;
+    if (timestamp > Date.now()) {return true; };
+    return false;
+  }
+
+  // --- Vérifie le token au chargement ---
+  function checkAccess() {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const communeInput = document.getElementById("communeInput");
+
+    if (token && isValidToken(token)) { communeInput.readOnly = false; console.log("débloqué") }
+    else { communeInput.readOnly = true; }
+  }
+
+  // --- Gestion du bouton ---
+  document.getElementById("tokenBtn").addEventListener("click", () => {
+    const current = localStorage.getItem(TOKEN_KEY) || "";
+    var endValidityTimestamp = LZString.decompressFromBase64(current);
+    var endValidityDate = new Date(endValidityTimestamp * 1000);
+    var  endValidityReadableDate =  endValidityDate.getDate() + "/" + parseInt(parseInt(endValidityDate.getMonth())+1) + "/" + endValidityDate.getFullYear();
+    const action = prompt(
+      "Jeton actuel (valable jusqu'au " + endValidityReadableDate + ") :\n" + (current || "(aucun)")
+    );
+
+    // nouveau jeton tout juste entré dans le prompt
+    const newToken = action.trim() || "";
+    var endValidityTimestamp = LZString.decompressFromBase64(newToken);
+    var endValidityDate = new Date(endValidityTimestamp * 1000);
+    var  endValidityReadableDate =  endValidityDate.getDate() + "/" + parseInt(parseInt(endValidityDate.getMonth())+1) + "/" + endValidityDate.getFullYear();
+
+    var validityMsg = "";
+    var changeMsg = "";
+    if (newToken && isValidToken(newToken)) {
+      var validityMsg = "Jeton valide jusqu'au " + endValidityReadableDate;
+    } else { var validityMsg = "Ce jeton n'est plus valide depuis "+ endValidityReadableDate;}
+
+    if (action !== null && action.trim() !== "") {
+      localStorage.setItem(TOKEN_KEY, action.trim());
+      var changeMsg = "✅ Nouveau jeton enregistré !";
+    } else if (action === "") {
+      var changeMsg = "ℹ️ Aucun changement effectué.";
+    }
+    alert(validityMsg + "\n\n" + changeMsg);
+
+    checkAccess();
+  });
+
+  // --- Initialisation ---
+  checkAccess();
+
+  // END TOKEN ACCESS
+
 
   let map, streetViewMode = false;
   const datasets = {
@@ -512,48 +576,39 @@
     }
   }
 
-  function initSearchUI() {
+  function runSearch(query) {
     const searchInput = document.getElementById("communeInput");
     const resultsDiv = document.getElementById("results");
-    let timeout = null;
 
-    searchInput.addEventListener("input", () => {
-      const q = searchInput.value.trim();
-      resultsDiv.innerHTML = "";
-      if (q.length < 3) return;
+    const q = query.trim();
+    resultsDiv.innerHTML = "";
+    if (q.length < 3) return;
 
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        const query = normalizeString(q);
-        const parts = query.split(" ");
+    const normalized = normalizeString(q);
+    const parts = normalized.split(" ");
 
-        const filtered = communesCache.filter(c => {
-          const name = normalizeString(c.nom_commune_complet || "");
-          const dep = normalizeString(c.code_departement || "");
-          // si plusieurs mots : un peut correspondre au département, l'autre au nom
-          return parts.every(p =>
-            name.includes(p) || dep.startsWith(p)
-          );
-        });
+    const filtered = communesCache.filter(c => {
+      const name = normalizeString(c.nom_commune_complet || "");
+      const dep = normalizeString(c.code_departement || "");
+      return parts.every(p => name.includes(p) || dep.startsWith(p));
+    });
 
-        resultsDiv.innerHTML = "";
-        if (filtered.length === 0) {
-          resultsDiv.innerHTML = `<div class="result-item">Aucun résultat</div>`;
-          return;
-        }
-        if (filtered.length === 1) {
-          selectCommune(filtered[0]);
-          return;
-        }
+    resultsDiv.innerHTML = "";
+    if (filtered.length === 0) {
+      resultsDiv.innerHTML = `<div class="result-item">Aucun résultat</div>`;
+      return;
+    }
+    if (filtered.length === 1) {
+      selectCommune(filtered[0]);
+      return;
+    }
 
-        filtered.slice(0, 20).forEach(c => {
-          const item = document.createElement("div");
-          item.className = "result-item";
-          item.textContent = `${c.nom_commune_complet} (${c.code_departement})`;
-          item.addEventListener("click", () => selectCommune(c));
-          resultsDiv.appendChild(item);
-        });
-      }, 300);
+    filtered.slice(0, 20).forEach(c => {
+      const item = document.createElement("div");
+      item.className = "result-item";
+      item.textContent = `${c.nom_commune_complet} (${c.code_departement})`;
+      item.addEventListener("click", () => selectCommune(c));
+      resultsDiv.appendChild(item);
     });
   }
 
@@ -569,6 +624,32 @@
        loadDatasets(code);
     }
   }
+
+  function initSearchUI() {
+    const searchInput = document.getElementById("communeInput");
+    const searchBtn = document.getElementById("searchBtn");
+    let timeout = null;
+
+    searchInput.addEventListener("click", () => {
+      if (searchInput.readOnly) {
+        alert("Vous devez entrer un jeton pour changer de commune.\n\nC'est votre jour de chance, en voici un :\n\nIwdgbCBMkKxgDPIA")
+      };
+    });
+
+    // Input event
+    searchInput.addEventListener("input", () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => runSearch(searchInput.value), 300);
+    });
+
+    // Click event
+    searchBtn.addEventListener("click", () => {
+      const commune = searchInput.value;
+      console.log("Recherche au clic :", commune);
+      runSearch(commune);
+    });
+  }
+
   </script>
 </body>
 </html>
