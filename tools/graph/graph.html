@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Visualiseur CSV (D3)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 18px; }
+    .controls { display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+    label { font-size:0.95rem; }
+    input[type="text"] { padding:6px 8px; font-size:1rem; min-width:220px; }
+    button { padding:6px 8px; font-size:0.95rem; cursor:pointer; }
+    .chart-wrap { border:1px solid #ddd; padding:8px; border-radius:8px; background:#fff; }
+    .toolbar { display:flex; gap:6px; margin-bottom:6px; }
+    svg { width:100%; height:480px; display:block; }
+    .axis-button { width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; border:1px solid #ccc; background:#f8f8f8; }
+    .info { margin-top:10px; color:#555; font-size:0.9rem; }
+    .error { color:crimson; }
+  </style>
+</head>
+<body>
+  <h2>Visualiseur CSV — D3.js</h2>
+
+  <div class="controls">
+    <label for="id-input">Sélectionner l'id :</label>
+    <!-- input + datalist pour recherche + dropdown -->
+    <input id="id-input" list="ids-list" placeholder="Tapez ou choisissez un id..." />
+    <datalist id="ids-list"></datalist>
+
+    <button id="load-btn">Charger</button>
+
+    <div style="margin-left:10px">
+      <button id="reset-btn">Réinitialiser vue</button>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <div class="toolbar" aria-hidden="false">
+      <!-- zoom/pan buttons -->
+      <div>
+        <button class="axis-button" id="zoom-in" title="Zoom in">+</button>
+        <button class="axis-button" id="zoom-out" title="Zoom out">−</button>
+      </div>
+
+      <div>
+        <button class="axis-button" id="pan-left" title="Pan left">←</button>
+        <button class="axis-button" id="pan-right" title="Pan right">→</button>
+        <button class="axis-button" id="pan-up" title="Pan up">↑</button>
+        <button class="axis-button" id="pan-down" title="Pan down">↓</button>
+      </div>
+
+      <div style="margin-left:auto; font-size:0.9rem; color:#444;">
+        Utiliser la molette/déplacement souris pour zoomer et glisser pour déplacer.
+      </div>
+    </div>
+
+    <svg id="chart" role="img" aria-label="Graphique de la série temporelle"></svg>
+  </div>
+
+  <div class="info">
+    <div>Format CSV attendu (sans ou avec en-tête) : <code>date;valeur</code> ou <code>date,value</code> (séparateur ; ou ,). Date peut être : <code>HH:mm</code>, <code>dd-MM</code> (00:00) ou <code>YYYY</code> (01/01 00:00).</div>
+    <div class="error" id="error-msg" style="display:none"></div>
+  </div>
+
+  <!-- D3 v7 -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script>
+  (function(){
+    // ---------- Configuration ----------
+    const INDEX_PATH = './data/index.json'; // server-updated file
+    const DATA_PATH = id => `./data/${id}/data.csv`; // where csv lives
+    const svg = d3.select('#chart');
+    const margin = {top:18, right:20, bottom:48, left:64};
+    const width = Math.max(600, svg.node().clientWidth) - margin.left - margin.right;
+    const height = 480 - margin.top - margin.bottom;
+
+    svg.attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`);
+
+    const container = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+    const clipId = 'clip-' + Math.random().toString(36).slice(2,9);
+    container.append('clipPath').attr('id', clipId)
+      .append('rect').attr('width', width).attr('height', height);
+
+    const xAxisG = container.append('g').attr('class','x axis').attr('transform', `translate(0,${height})`);
+    const yAxisG = container.append('g').attr('class','y axis');
+
+    const lineG = container.append('g').attr('clip-path', `url(#${clipId})`);
+    const linePath = lineG.append('path').attr('fill','none').attr('stroke','steelblue').attr('stroke-width',1.6);
+
+    // scales
+    let xScale = d3.scaleTime().range([0,width]);
+    let yScale = d3.scaleLinear().range([height,0]);
+
+    // axes
+    const xAxis = d3.axisBottom(xScale).ticks(6).tickSizeOuter(0);
+    const yAxis = d3.axisLeft(yScale).ticks(6).tickSizeOuter(0);
+
+    // zoom behavior
+    const zoom = d3.zoom()
+      .scaleExtent([0.5, 50])
+      .translateExtent([[-1000,-1000],[1000 + width,1000 + height]])
+      .extent([[0,0],[width,height]])
+      .on('zoom', zoomed);
+
+    svg.call(zoom);
+
+    // store original domains so reset is possible
+    let originalXDomain = null;
+    let originalYDomain = null;
+
+    // UI elements
+    const idInput = document.getElementById('id-input');
+    const idsList = document.getElementById('ids-list');
+    const loadBtn = document.getElementById('load-btn');
+    const errorMsg = document.getElementById('error-msg');
+    const resetBtn = document.getElementById('reset-btn');
+
+    // --- Lire paramètre ?id=xxxx dans l'URL ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlId = urlParams.get("id");
+
+    if (urlId) {
+      idInput.value = urlId;   // pré-remplit le champ
+      // charger automatiquement les données
+      loadAndDraw(urlId);
+    }
+
+
+    // zoom/pan buttons
+    document.getElementById('zoom-in').addEventListener('click', () => zoomButton(1.4));
+    document.getElementById('zoom-out').addEventListener('click', () => zoomButton(1/1.4));
+    document.getElementById('pan-left').addEventListener('click', () => panButton(-0.15, 0));
+    document.getElementById('pan-right').addEventListener('click', () => panButton(0.15, 0));
+    document.getElementById('pan-up').addEventListener('click', () => panButton(0, -0.15));
+    document.getElementById('pan-down').addEventListener('click', () => panButton(0, 0.15));
+    resetBtn.addEventListener('click', resetView);
+
+    loadBtn.addEventListener('click', () => {
+      const id = idInput.value.trim();
+      if (!id) { showError('Merci de saisir un id.'); return; }
+      loadAndDraw(id);
+    });
+
+    // Try to prefill datalist using index.json
+    fetch(INDEX_PATH).then(r => {
+      if (!r.ok) throw new Error(`index.json non trouvé (${r.status})`);
+      return r.json();
+    }).then(list => {
+      // expect array of string ids
+      if (!Array.isArray(list)) throw new Error('index.json doit contenir un tableau JSON de ids.');
+      idsList.innerHTML = '';
+      list.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item;
+        idsList.appendChild(opt);
+      });
+      // optionally preselect first
+      if (list.length > 0 && !idInput.value) idInput.value = list[0];
+    }).catch(err => {
+      showError(`Impossible de charger ${INDEX_PATH} : ${err.message}`);
+    });
+
+    // ---------- CSV parsing helpers ----------
+    // Accept separators ; or , for column delim
+    function splitCSVLine(line){
+      // naive split: if line contains ';' use it, else comma
+      if (line.indexOf(';') >= 0) return line.split(';');
+      return line.split(',');
+    }
+
+    function parseValueToken(tok){
+      if (!tok) return NaN;
+      // replace comma decimal by dot and remove spaces
+      // tok = tok.trim().replace(/\s+/g,'').replace(',', '.');
+      const v = parseFloat(tok);
+      return isNaN(v) ? NaN : v;
+    }
+
+    function parseDateToken(tok){
+      if (!tok) return null;
+      tok = tok.trim();
+      const now = new Date();
+      const currentYear = now.getFullYear();
+
+      // HH:mm
+      const re_hm = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      // dd-MM (day-month)
+      const re_dm = /^([0-2]\d|3[0-1])-([0]\d|1[0-2])$/;
+      // YYYY
+      const re_yr = /^(\d{4})$/;
+
+      let m;
+      if (m = tok.match(re_hm)){
+        const hh = +m[1], mm = +m[2];
+        // use current date (year, month, day) with given time
+        return new Date(currentYear, now.getMonth(), now.getDate(), hh, mm, 0, 0);
+      } else if (m = tok.match(re_dm)){
+        const dd = +m[1], mm = +m[2];
+        // day-month in current year at 00:00
+        return new Date(currentYear, mm - 1, dd, 0, 0, 0, 0);
+      } else if (m = tok.match(re_yr)){
+        const yy = +m[1];
+        return new Date(yy, 0, 1, 0, 0, 0, 0); // Jan 1st
+      } else {
+        // try to parse ISO-ish fallback
+        const d = new Date(tok);
+        if (!isNaN(d)) return d;
+        return null;
+      }
+    }
+
+    // ---------- Loading + drawing ----------
+    async function loadAndDraw(id){
+      clearError();
+      const path = DATA_PATH(id);
+      try {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(`Fichier non trouvé ${path} (${res.status})`);
+        const text = await res.text();
+        const data = parseCSVText(text);
+        if (data.length === 0) throw new Error('Aucune ligne de données valide trouvée.');
+        draw(data);
+      } catch (err){
+        showError(err.message);
+      }
+    }
+
+    function parseCSVText(text){
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      const rows = [];
+      for (let i=0;i<lines.length;i++){
+        const line = lines[i];
+        // skip common header heuristics: if first line contains alphabetic and not matching date token, skip it
+        if (i === 0){
+          const firstTok = splitCSVLine(line)[0] || '';
+          if (/[A-Za-z]/.test(firstTok) && !/^\d/.test(firstTok)) {
+            // header line -> skip
+            continue;
+          }
+        }
+        const cols = splitCSVLine(line);
+        if (cols.length < 2) continue;
+        const dt = parseDateToken(cols[0]);
+        const val = parseValueToken(cols[1]);
+        if (!dt || isNaN(val)) continue;
+        rows.push({date: dt, value: val});
+      }
+      // sort by date ascending
+      rows.sort((a,b) => a.date - b.date);
+      return rows;
+    }
+
+    function draw(data){
+      // set domains
+      xScale.domain(d3.extent(data, d => d.date));
+      yScale.domain([d3.min(data, d => d.value), d3.max(data, d => d.value)]);
+      // keep copies
+      originalXDomain = xScale.domain().slice();
+      originalYDomain = yScale.domain().slice();
+
+      // line generator
+      const line = d3.line()
+        .x(d => xScale(d.date))
+        .y(d => yScale(d.value))
+        .curve(d3.curveMonotoneX);
+
+      // draw axes
+      xAxisG.call(xAxis);
+      yAxisG.call(yAxis);
+
+      // draw line
+      linePath.datum(data).transition().duration(300).attr('d', line);
+
+      // draw points for clarity
+      // const pts = lineG.selectAll('.pt').data(data);
+      // pts.join(
+      //   enter => enter.append('circle').attr('class','pt').attr('r',2.4).attr('cx', d => xScale(d.date)).attr('cy', d => yScale(d.value)).attr('opacity',0.9),
+      //   update => update.transition().duration(250).attr('cx', d => xScale(d.date)).attr('cy', d => yScale(d.value)),
+      //   exit => exit.remove()
+      // );
+
+      // attach tooltip interactions
+      attachTooltip();
+
+      // reset any zoom transform
+      svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+    }
+
+    // ---------- zoom/pan handling ----------
+    function zoomed(event){
+      const t = event.transform;
+      const zx = t.rescaleX(xScale);
+      const zy = t.rescaleY(yScale);
+
+      // update axes and line / points
+      xAxisG.call(xAxis.scale(zx));
+      yAxisG.call(yAxis.scale(zy));
+
+      // update line path and points positions by recalculating using zx/zy
+      const data = linePath.datum();
+      if (data) {
+        const lineGen = d3.line()
+          .x(d => zx(d.date))
+          .y(d => zy(d.value))
+          .curve(d3.curveMonotoneX);
+        linePath.attr('d', lineGen);
+        lineG.selectAll('.pt').attr('cx', d => zx(d.date)).attr('cy', d => zy(d.value));
+      }
+    }
+
+    // programmatic zoom button (scale factor)
+    function zoomButton(factor){
+      svg.transition().duration(250).call(zoom.scaleBy, factor);
+    }
+
+    // programmatic pan: dx,dy are fractions of current domain width/height
+    function panButton(fracX, fracY){
+      // compute pixel translation relative to current transform
+      // get current transform
+      const t = d3.zoomTransform(svg.node());
+      // translate in pixels
+      const dx = fracX * width;
+      const dy = fracY * height;
+      svg.transition().duration(220).call(zoom.translateBy, dx, dy);
+    }
+
+    function resetView(){
+      svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+      // also reset scales if you want to reset to original domain (but zoom.transform identity will cause axes to redraw accordingly)
+      if (originalXDomain && originalYDomain){
+        xScale.domain(originalXDomain.slice());
+        yScale.domain(originalYDomain.slice());
+        xAxisG.call(xAxis);
+        yAxisG.call(yAxis);
+        // redraw line with original scales
+        const data = linePath.datum();
+        if (data) {
+          const lineGen = d3.line()
+            .x(d => xScale(d.date))
+            .y(d => yScale(d.value))
+            .curve(d3.curveMonotoneX);
+          linePath.attr('d', lineGen);
+          lineG.selectAll('.pt').attr('cx', d => xScale(d.date)).attr('cy', d => yScale(d.value));
+        }
+      }
+    }
+
+    // ---------- tooltip ----------
+    function attachTooltip(){
+      // simple tooltip box
+      let tooltip = d3.select('body').selectAll('.d3-tooltip').data([null]);
+      tooltip = tooltip.enter().append('div').attr('class','d3-tooltip').merge(tooltip);
+      tooltip.style('position','absolute').style('pointer-events','none').style('background','#fff').style('border','1px solid #ccc').style('padding','6px 8px').style('border-radius','6px').style('font-size','0.9rem').style('display','none');
+
+      lineG.selectAll('.pt')
+        .on('mouseenter', (event,d) => {
+          const fmtDate = d3.timeFormat('%Y-%m-%d %H:%M')(d.date);
+          tooltip.style('display','block').html(`<strong>${fmtDate}</strong><div>${d.value}</div>`);
+        })
+        .on('mousemove', (event) => {
+          tooltip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY + 12) + 'px');
+        })
+        .on('mouseleave', () => tooltip.style('display','none'));
+    }
+
+    // ---------- UI helpers ----------
+    function showError(msg){
+      errorMsg.style.display = 'block';
+      errorMsg.textContent = msg;
+    }
+    function clearError(){
+      errorMsg.style.display = 'none';
+      errorMsg.textContent = '';
+    }
+
+    // Preload: if datalist has value (first option) - auto load on pressing Enter in input
+    idInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        loadBtn.click();
+      }
+    });
+
+    // Auto load first id after datalist load if present
+    // (we set earlier idInput.value to first list item if any)
+    // If you want auto load on page open, uncomment:
+    // if (idInput.value) loadAndDraw(idInput.value);
+
+  })();
+  </script>
+</body>
+</html>
