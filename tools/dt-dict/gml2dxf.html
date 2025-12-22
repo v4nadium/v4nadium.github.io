@@ -2,20 +2,21 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>GML → DXF R12 (AutoCAD)</title>
+  <title>DT - Extraire l'emprise</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.19.10/proj4.js"></script>
   <style>
     body { font-family: sans-serif; padding: 1em; }
     pre { background: #eee; padding: 1em; }
+    input { padding: 1em; }
+    button { padding: 1am; }
   </style>
 </head>
 <body>
 
-<h2>Extraire les emprises (Conversion GML → DXF R12 (AutoCAD compatible))</h2>
-<p>Sélectionner un fichier .xml issu d'une DT :</p>
-<input type="file" id="fileInput" accept=".xml,.gml">
+<h2>Extraire les emprises d'une DT à partir du XML</h2>
+<p>Sélectionner un fichier .xml issu d'une DT : <input type="file" id="fileInput" accept=".xml,.gml"></p>
 <br><br>
-<button id="exportBtn" disabled>Exporter DXF R12</button>
+<button id="exportBtn" disabled>Convertir en DXF</button>
 
 <pre id="log"></pre>
 
@@ -138,8 +139,7 @@ document.getElementById("fileInput").addEventListener("change", e => {
 
     log.textContent =
       `✔ ${polygons.length} polygone(s) détecté(s)\n` +
-      `✔ Export DXF R12 prêt\n` +
-      `✔ Compatible AutoCAD strict`;
+      `✔ Export DXF R12 prêt`;
 
     document.getElementById("exportBtn").disabled = false;
   };
