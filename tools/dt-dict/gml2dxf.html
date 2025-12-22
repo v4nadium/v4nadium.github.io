@@ -7,8 +7,8 @@
   <style>
     body { font-family: sans-serif; padding: 1em; }
     pre { background: #eee; padding: 1em; }
-    input { padding: 1em; }
-    button { padding: 1am; }
+    input::file-selector-button { padding: 0.75em; }
+    button { padding: 0.75em; }
   </style>
 </head>
 <body>
@@ -139,7 +139,7 @@ document.getElementById("fileInput").addEventListener("change", e => {
 
     log.textContent =
       `✔ ${polygons.length} polygone(s) détecté(s)\n` +
-      `✔ Export DXF R12 prêt`;
+      `✔ Export DXF prêt`;
 
     document.getElementById("exportBtn").disabled = false;
   };
@@ -152,7 +152,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "export_r12.dxf";
+  a.download = "emprise_dt.dxf";
   a.click();
   URL.revokeObjectURL(url);
 });
@@ -160,4 +160,3 @@ document.getElementById("exportBtn").addEventListener("click", () => {
 
 </body>
 </html>
-
