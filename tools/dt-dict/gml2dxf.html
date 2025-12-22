@@ -25,6 +25,7 @@
 
     let dxfData = "";
 
+    /*
     function writeDXFHeader() {
       return `0
 SECTION
@@ -50,6 +51,39 @@ SECTION
 ENTITIES
 `;
     }
+  */
+
+function writeDXFHeader() {
+  return `0
+SECTION
+2
+HEADER
+9
+$ACADVER
+1
+AC1015
+0
+ENDSEC
+0
+SECTION
+2
+TABLES
+0
+ENDSEC
+0
+SECTION
+2
+BLOCKS
+0
+ENDSEC
+0
+SECTION
+2
+ENTITIES
+`;
+}
+
+
 
     function writeDXFFooter() {
       return `0
