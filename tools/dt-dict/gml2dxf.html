@@ -58,6 +58,7 @@ ENDSEC
 EOF`;
     }
 
+    /*
     function writeDXFPolygon(coords) {
       let output = "0\nLWPOLYLINE\n8\n0\n70\n1\n";
       output += "90\n" + coords.length + "\n";
@@ -66,6 +67,23 @@ EOF`;
       }
       return output;
     }
+    */
+
+    function writeDXFPolygon(coords) {
+      let output = "0\nLWPOLYLINE\n";
+      output += "8\n0\n";                 // calque 0
+      output += "90\n" + coords.length + "\n"; // nombre de sommets
+      output += "70\n1\n";                // polyligne fermée
+    
+      for (let pt of coords) {
+        output +=
+          "10\n" + pt[0].toFixed(3) + "\n" +
+          "20\n" + pt[1].toFixed(3) + "\n";
+      }
+    
+      return output;
+    }
+
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
       const file = e.target.files[0];
