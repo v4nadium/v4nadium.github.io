@@ -2,7 +2,8 @@ Calendrier annuel,                   Temps,              ./tools/dates/calendrie
 Frise chronologique,                 Temps,              ./tools/dates/frise.html
 Puissance 4,                         Jeux,               ./tools/jeux/puissance4.html
 Formateur de glose interlinéaire,    Linguistique,       ./tools/ling/gloss-auto.html
-Extracteur d'emprise DT-DICT,        Travaux publics,    ./tools/dt-dict/gml2dxf.html
+Extracteur d'emprise DT-DICT,        Géo,                ./tools/geo/gml2dxf.html
+Conversion Shape vers Excel,         Géo,                ./tools/geo/shp2xlsx.html
 Conversion de données géographiques, Géo,                https://gdal3.js.org/
 Explorateur cadastral,               Géo,                ./tools/geo/explorateur-cadastral.html
 DVF (Demande de Valeur Foncière),    Géo,                https://app.dvf.etalab.gouv.fr/
