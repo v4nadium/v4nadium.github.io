@@ -1,50 +1,15 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<title>Token Creator</title>
-<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
-<style>
-  body { font-family: Arial, sans-serif; padding: 2em; }
-  label { display:block; margin-top:1em; }
-  input, textarea { padding: 0.5em; width: 300px; }
-  textarea { height: 60px; }
-</style>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0; url=/nouvelle-page.html">
+  <link rel="canonical" href="https://v4nadium.pages.gay/tools/geo/tokenCreator.html">
+  <title>Redirection...</title>
 </head>
 <body>
-
-<h2>Token Creator</h2>
-
-<label>Date :</label>
-<input type="date" id="dateInput">
-
-<label>Timestamp (ms) :</label>
-<input type="text" id="tsOutput" readonly>
-
-<label>Encodage LZString (Base64) :</label>
-<textarea id="lzOutput" readonly></textarea>
-
-<script>
-document.getElementById("dateInput").addEventListener("input", () => {
-    const dateStr = document.getElementById("dateInput").value;
-    if (!dateStr) return;
-
-    // Création d'une date sans ambiguïté (UTC pour éviter décalages de fuseau)
-    const parts = dateStr.split("-");
-    const year = parseInt(parts[0]);
-    const month = parseInt(parts[1]) - 1; // mois = 0-11
-    const day = parseInt(parts[2]);
-
-    const timestamp = Date.UTC(year, month, day)/1000;
-
-    // Affichage du timestamp
-    document.getElementById("tsOutput").value = timestamp;
-
-    // Encodage en LZString Base64
-    const encoded = LZString.compressToBase64(timestamp.toString());
-    document.getElementById("lzOutput").value = encoded;
-});
-</script>
-
+  <p>Redirection vers <a href="https://v4nadium.pages.gay/tools/geo/tokenCreator.html">tokenCreator.html</a>...</p>
+  <script>
+    window.location.href = "https://v4nadium.pages.gay/tools/geo/tokenCreator.html";
+  </script>
 </body>
 </html>
